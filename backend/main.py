@@ -21,16 +21,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def load_env_from_file():
+    """从.env.local文件加载环境变量（Railway部署时使用）"""
+    env_file = ".env.local"
+    env_vars = {}
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key.strip()] = value.strip()
+        except Exception as e:
+            print(f"读取.env.local文件失败: {e}")
+    return env_vars
+
+# 首先从.env.local文件加载环境变量
+env_from_file = load_env_from_file()
+
 # 可以选择使用DeepSeek或Minimax
-MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "deepseek")  # deepseek 或 minimax
+# 优先使用系统环境变量，其次使用文件中的变量
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", env_from_file.get("MODEL_PROVIDER", "deepseek"))  # deepseek 或 minimax
 
 # DeepSeek配置
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL   = "deepseek-chat"
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", env_from_file.get("DEEPSEEK_API_KEY", ""))
 
 # Minimax配置 (Anthropic兼容API)
-MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", env_from_file.get("MINIMAX_API_KEY", ""))
+
+# 调试信息
+print(f"MODEL_PROVIDER: {MODEL_PROVIDER}")
+print(f"MINIMAX_API_KEY长度: {len(MINIMAX_API_KEY) if MINIMAX_API_KEY else 0}")
+print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 0}")
+
+# API端点配置
+DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL   = "deepseek-chat"
 MINIMAX_URL     = "https://api.minimaxi.com/anthropic/v1/messages"
 MINIMAX_MODEL   = "MiniMax-M2.5"  # 根据Minimax官方示例
 
@@ -197,6 +224,13 @@ async def analyze(req: AnalyzeRequest, request: Request):
         api_url = MINIMAX_URL
         api_key = MINIMAX_API_KEY
         model = MINIMAX_MODEL
+
+        # 调试信息
+        print(f"使用Minimax提供商")
+        print(f"API Key长度: {len(api_key) if api_key else 0}")
+        print(f"API URL: {api_url}")
+        print(f"模型: {model}")
+
         # Minimax图片格式要求
         image_config = {
             "url": f"data:image/png;base64,{req.image_base64}",
@@ -310,4 +344,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
         raise HTTPException(status_code=502, detail=f"{provider_name} API 错误: {e.response.status_code}")
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"分析失败错误详情:\n{error_details}")  # 输出到服务器日志
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
