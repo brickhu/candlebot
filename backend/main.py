@@ -21,9 +21,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 可以选择使用DeepSeek或Minimax
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "deepseek")  # deepseek 或 minimax
+
+# DeepSeek配置
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL   = "deepseek-chat"
+
+# Minimax配置 (Anthropic兼容API)
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
-MINIMAX_URL     = "https://api.minimax.chat/v1/chat/completions"
-MINIMAX_MODEL   = "abab6-chat"
+MINIMAX_URL     = "https://api.minimaxi.com/anthropic/v1/messages"
+MINIMAX_MODEL   = "MiniMax-M2.5"  # 根据Minimax官方示例
 
 DAILY_FREE_LIMIT = 5
 usage_store: dict = defaultdict(lambda: {"count": 0, "date": ""})
@@ -182,43 +191,106 @@ async def analyze(req: AnalyzeRequest, request: Request):
     lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
     system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
 
-    # Minimax API 图片格式要求：base64编码，需要指定mime_type
-    payload = {
-        "model": MINIMAX_MODEL,
-        "max_tokens": 3000,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{req.image_base64}",
-                            "detail": "high"  # 可选：low, high, auto
+    # 根据配置选择模型提供商
+    if MODEL_PROVIDER == "minimax":
+        # Minimax API 配置
+        api_url = MINIMAX_URL
+        api_key = MINIMAX_API_KEY
+        model = MINIMAX_MODEL
+        # Minimax图片格式要求
+        image_config = {
+            "url": f"data:image/png;base64,{req.image_base64}",
+            "detail": "high"  # 可选：low, high, auto
+        }
+    else:
+        # DeepSeek API 配置（默认）
+        api_url = DEEPSEEK_URL
+        api_key = DEEPSEEK_API_KEY
+        model = DEEPSEEK_MODEL
+        # DeepSeek图片格式
+        image_config = {"url": f"data:image/png;base64,{req.image_base64}"}
+
+    # 根据API提供商构建不同的payload
+    if MODEL_PROVIDER == "minimax":
+        # Anthropic兼容格式
+        payload = {
+            "model": model,
+            "max_tokens": 3000,
+            "system": system_prompt,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": req.image_base64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
                         }
-                    },
-                    {
-                        "type": "text",
-                        "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                    }
-                ]
-            }
-        ]
-    }
+                    ]
+                }
+            ]
+        }
+    else:
+        # DeepSeek格式 (OpenAI兼容)
+        payload = {
+            "model": model,
+            "max_tokens": 3000,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": image_config
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
+                        }
+                    ]
+                }
+            ]
+        }
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(
-                MINIMAX_URL,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {MINIMAX_API_KEY}",
+            # 根据API提供商设置不同的headers
+            if MODEL_PROVIDER == "minimax":
+                # Minimax使用x-api-key头
+                headers = {
+                    "x-api-key": api_key,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01"  # Anthropic API版本
+                }
+            else:
+                # DeepSeek使用Bearer token
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
                 }
+
+            resp = await client.post(
+                api_url,
+                json=payload,
+                headers=headers
             )
             resp.raise_for_status()
-            raw = resp.json()["choices"][0]["message"]["content"]
+
+            # 解析响应，不同API返回格式不同
+            if MODEL_PROVIDER == "minimax":
+                # Anthropic格式响应
+                raw = resp.json()["content"][0]["text"]
+            else:
+                # OpenAI格式响应
+                raw = resp.json()["choices"][0]["message"]["content"]
 
         meta = {}
         for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
@@ -235,6 +307,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         }
 
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Minimax API 错误: {e.response.status_code}")
+        provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
+        raise HTTPException(status_code=502, detail=f"{provider_name} API 错误: {e.response.status_code}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
