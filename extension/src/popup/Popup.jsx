@@ -2,7 +2,7 @@
 import { createSignal, createEffect, Show } from 'solid-js'
 
 // ← 部署 Railway 后替换为你的真实 URL
-const API_BASE = 'https://your-railway-app.railway.app'
+const API_BASE = 'https://candelbot-backend-production.up.railway.app'
 
 function ratingClass(score) {
   const s = parseInt(score) || 0

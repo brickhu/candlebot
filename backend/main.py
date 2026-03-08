@@ -1,6 +1,6 @@
 """
 Candlebot Backend — FastAPI
-DeepSeek API 中转 + 每日免费次数限制
+Minimax API 中转 + 每日免费次数限制
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -21,9 +21,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_URL     = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL   = "deepseek-chat"
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+MINIMAX_URL     = "https://api.minimax.chat/v1/chat/completions"
+MINIMAX_MODEL   = "abab6-chat"
 
 DAILY_FREE_LIMIT = 5
 usage_store: dict = defaultdict(lambda: {"count": 0, "date": ""})
@@ -182,8 +182,9 @@ async def analyze(req: AnalyzeRequest, request: Request):
     lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
     system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
 
+    # Minimax API 图片格式要求：base64编码，需要指定mime_type
     payload = {
-        "model": DEEPSEEK_MODEL,
+        "model": MINIMAX_MODEL,
         "max_tokens": 3000,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -192,7 +193,10 @@ async def analyze(req: AnalyzeRequest, request: Request):
                 "content": [
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{req.image_base64}"}
+                        "image_url": {
+                            "url": f"data:image/png;base64,{req.image_base64}",
+                            "detail": "high"  # 可选：low, high, auto
+                        }
                     },
                     {
                         "type": "text",
@@ -206,10 +210,10 @@ async def analyze(req: AnalyzeRequest, request: Request):
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
-                DEEPSEEK_URL,
+                MINIMAX_URL,
                 json=payload,
                 headers={
-                    "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                    "Authorization": f"Bearer {MINIMAX_API_KEY}",
                     "Content-Type": "application/json"
                 }
             )
@@ -231,6 +235,6 @@ async def analyze(req: AnalyzeRequest, request: Request):
         }
 
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"DeepSeek API 错误: {e.response.status_code}")
+        raise HTTPException(status_code=502, detail=f"Minimax API 错误: {e.response.status_code}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
