@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Candlebot · K线专家",
+  "version": "1.0.0",
+  "description": "AI读懂K线图表，一键生成做多做空分析报告 | AI-powered chart analysis for aggr.trade & TradingView",
+  "icons": {
+    "16":  "public/icons/icon16.png",
+    "48":  "public/icons/icon48.png",
+    "128": "public/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16":  "public/icons/icon16_off.png",
+      "48":  "public/icons/icon48_off.png",
+      "128": "public/icons/icon128_off.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://aggr.trade/*",
+        "*://*.aggr.trade/*",
+        "*://www.tradingview.com/*",
+        "*://tradingview.com/*"
+      ],
+      "js": ["src/content/index.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "*://aggr.trade/*",
+    "*://*.aggr.trade/*",
+    "*://www.tradingview.com/*",
+    "*://tradingview.com/*"
+  ]
+}
