@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
+import json
 import os
 import re
 import time
@@ -320,8 +321,32 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
             # 解析响应，不同API返回格式不同
             if MODEL_PROVIDER == "minimax":
-                # Anthropic格式响应
-                raw = resp.json()["content"][0]["text"]
+                # Anthropic格式响应 - 需要查找text类型的响应
+                response_data = resp.json()
+                print(f"Minimax响应数据: {json.dumps(response_data, indent=2, ensure_ascii=False)[:500]}...")
+
+                raw = ""
+                if "content" in response_data:
+                    # 查找text类型的响应
+                    for item in response_data["content"]:
+                        if item.get("type") == "text" and "text" in item:
+                            raw = item["text"]
+                            break
+
+                if not raw:
+                    # 如果没有找到text响应，使用第一个可用的内容
+                    if response_data.get("content") and len(response_data["content"]) > 0:
+                        # 尝试获取任何可用的文本
+                        for item in response_data["content"]:
+                            if "text" in item:
+                                raw = item["text"]
+                                break
+                            elif "thinking" in item:
+                                raw = item["thinking"]
+                                break
+
+                    if not raw:
+                        raw = str(response_data)
             else:
                 # OpenAI格式响应
                 raw = resp.json()["choices"][0]["message"]["content"]
