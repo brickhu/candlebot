@@ -1,54 +1,27 @@
 """
 Candlebot Backend — FastAPI
-支持用户系统的AI K线分析API
+Minimax API 中转 + 每日免费次数限制
 """
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import httpx
+import json
 import os
 import re
-import json
-import hashlib
-from datetime import datetime, timedelta
-from typing import Optional
+import time
+from collections import defaultdict
 
-from fastapi import FastAPI, HTTPException, Request, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
-import httpx
-from sqlalchemy.orm import Session
+app = FastAPI(title="Candlebot API")
 
-# 导入自定义模块
-from database import engine, get_db
-import models
-import schemas
-import auth
-from routers import auth as auth_router, analysis as analysis_router, conversation as conversation_router
-
-# 创建数据库表
-models.Base.metadata.create_all(bind=engine)
-
-# 创建FastAPI应用
-app = FastAPI(
-    title="Candlebot API",
-    description="AI驱动的K线图表分析API，支持用户系统和历史记录",
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
-
-# CORS中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 在生产环境中应该限制来源
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
-# 包含路由
-app.include_router(auth_router.router)
-app.include_router(analysis_router.router)
-app.include_router(conversation_router.router)
-
-# 环境变量配置
 def load_env_from_file():
     """从.env.local文件加载环境变量（本地开发使用）"""
     env_file = ".env.local"
@@ -76,12 +49,36 @@ print(f"MINIMAX_API_KEY长度: {len(MINIMAX_API_KEY) if MINIMAX_API_KEY else 0}"
 print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 0}")
 
 # API 端点配置
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_URL   = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
-MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
-MINIMAX_MODEL = "MiniMax-Text-01"
 
-# 提示词配置（保持不变）
+# MiniMax-Text-01 是支持视觉理解的模型（VL-01 是开源权重名，API 平台不识别）
+# 图片通过 [Image base64:xxx] 嵌入文本传递，不是标准 image_url 格式
+MINIMAX_URL    = "https://api.minimaxi.com/v1/chat/completions"
+MINIMAX_MODEL  = "MiniMax-Text-01"
+
+DAILY_FREE_LIMIT = 5
+usage_store: dict = defaultdict(lambda: {"count": 0, "date": ""})
+
+
+def get_today() -> str:
+    return time.strftime("%Y-%m-%d")
+
+
+def check_and_increment(ip: str):
+    today = get_today()
+    record = usage_store[ip]
+    if record["date"] != today:
+        record["count"] = 0
+        record["date"] = today
+    remaining = DAILY_FREE_LIMIT - record["count"]
+    if remaining <= 0:
+        return False, 0
+    record["count"] += 1
+    return True, remaining - 1
+
+
+# ── 提示词 ──
 PROMPT_AGGR = """
 你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
 
@@ -186,51 +183,33 @@ TIMEFRAME:[时间周期，如15m]
 """
 
 
-@app.get("/")
-async def root():
-    """API根端点"""
-    return {
-        "name": "Candlebot API",
-        "version": "2.0.0",
-        "description": "AI驱动的K线图表分析API",
-        "docs": "/docs",
-        "endpoints": {
-            "auth": "/auth",
-            "analysis": "/analysis",
-            "conversation": "/conversation"
-        }
-    }
+class AnalyzeRequest(BaseModel):
+    image_base64: str
+    platform: str = "tradingview"
+    lang: str = "zh"
 
 
 @app.get("/health")
 async def health():
-    """健康检查端点"""
     return {
         "status": "ok",
         "provider": MODEL_PROVIDER,
-        "model": MINIMAX_MODEL if MODEL_PROVIDER == "minimax" else DEEPSEEK_MODEL,
-        "database": "connected",
-        "timestamp": datetime.utcnow().isoformat()
+        "model": MINIMAX_MODEL if MODEL_PROVIDER == "minimax" else DEEPSEEK_MODEL
     }
 
 
-@app.post("/analyze", response_model=schemas.AnalyzeResponse)
-async def analyze(
-    req: schemas.AnalyzeRequest,
-    request: Request,
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """分析K线图表（需要用户认证）"""
-    # 检查用户配额
-    allowed, remaining = auth.check_user_quota(current_user)
+@app.post("/analyze")
+async def analyze(req: AnalyzeRequest, request: Request):
+    ip = request.client.host
+    allowed, remaining = check_and_increment(ip)
+
     if not allowed:
         raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            status_code=429,
             detail={
                 "error": "daily_limit_exceeded",
-                "message": f"今日免费次数已用完（{current_user.quota_total}次/天），请明日再试",
-                "message_en": f"Daily free limit reached ({current_user.quota_total}/day). Try again tomorrow."
+                "message": "今日免费次数已用完（5次/天），请明日再试",
+                "message_en": "Daily free limit reached (5/day). Try again tomorrow."
             }
         )
 
@@ -238,13 +217,16 @@ async def analyze(
     lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
     system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
 
-    # 调用AI API
     if MODEL_PROVIDER == "minimax":
         api_url = MINIMAX_URL
         api_key = MINIMAX_API_KEY
         model = MINIMAX_MODEL
 
-        # MiniMax 官方视觉格式
+        print(f"使用Minimax提供商: {model}")
+        print(f"API Key长度: {len(api_key) if api_key else 0}")
+        print(f"image_base64长度: {len(req.image_base64) if req.image_base64 else 0}")
+
+        # ✅ MiniMax 官方视觉格式：图片用 [Image base64:xxx] 嵌入到 user 文本中
         payload = {
             "model": model,
             "max_tokens": 3000,
@@ -257,6 +239,7 @@ async def analyze(
             ]
         }
 
+        # ✅ OpenAI 兼容接口使用 Bearer token
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -308,51 +291,22 @@ async def analyze(
 
             resp.raise_for_status()
 
-            # OpenAI 兼容格式解析
+            # OpenAI 兼容格式解析（Minimax 和 DeepSeek 统一）
             raw = resp.json()["choices"][0]["message"]["content"]
 
-        # 解析元数据
         meta = {}
         for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
             m = re.search(rf"{key}:(.+?)(?:\n|$)", raw)
             meta[key.lower()] = m.group(1).strip() if m else ""
 
-        # 清理报告内容
         clean = re.sub(r"\n*---\s*\nMETADATA.*$", "", raw, flags=re.DOTALL).strip()
 
-        # 计算图片哈希
-        image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
-
-        # 保存分析记录到数据库
-        db_record = models.AnalysisRecord(
-            user_id=current_user.id,
-            platform=platform,
-            image_hash=image_hash,
-            image_data=req.image_base64,  # 可选：保存图片数据
-            report_data={
-                "report": clean,
-                "raw": raw,
-                "lang": req.lang
-            },
-            metadata=meta
-        )
-        db.add(db_record)
-        db.commit()
-        db.refresh(db_record)
-
-        # 增加用户配额使用
-        auth.increment_user_quota(db, current_user)
-
-        # 重新计算剩余次数
-        _, new_remaining = auth.check_user_quota(current_user)
-
-        return schemas.AnalyzeResponse(
-            report=clean,
-            meta=schemas.AnalysisMetadata(**meta),
-            remaining_today=new_remaining,
-            platform=platform,
-            record_id=db_record.id
-        )
+        return {
+            "report": clean,
+            "meta": meta,
+            "remaining_today": remaining,
+            "platform": platform
+        }
 
     except httpx.HTTPStatusError as e:
         provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
@@ -367,38 +321,3 @@ async def analyze(
         error_details = traceback.format_exc()
         print(f"分析失败错误详情:\n{error_details}")
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
-
-
-@app.post("/ask", response_model=schemas.AskResponse)
-async def ask_question(
-    ask_data: schemas.AskRequest,
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """提问关于分析报告的问题"""
-    # 这个端点现在由conversation路由器处理
-    # 这里保持向后兼容，重定向到新的端点
-    from routers.conversation import ask_question as conversation_ask
-
-    return await conversation_ask(
-        analysis_id=ask_data.analysis_id,
-        ask_data=ask_data,
-        current_user=current_user,
-        db=db
-    )
-
-
-# 中间件：记录API访问日志
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = datetime.utcnow()
-
-    response = await call_next(request)
-
-    process_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-
-    # 可以在这里记录到数据库
-    # 暂时只打印日志
-    print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}ms")
-
-    return response

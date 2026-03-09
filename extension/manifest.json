@@ -16,6 +16,9 @@
       "128": "public/icons/icon128_off.png"
     }
   },
+  "chrome_url_overrides": {
+    "newtab": "src/dashboard/index.html"
+  },
   "background": {
     "service_worker": "src/background/index.js",
     "type": "module"

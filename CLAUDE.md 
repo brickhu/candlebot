@@ -1,0 +1,83 @@
+
+# CLAUDE.md — Candlebot 项目上下文
+
+> 供 Claude Code 使用。每次新会话自动读取此文件恢复完整上下文。
+
+---
+
+## 项目概览
+
+| 字段 | 内容 |
+|------|------|
+| 产品名 | **CandleBot**（中文名：K线专家） |
+| 定位 | Chrome 扩展，帮助交易者使用 AI 读懂 K 线图表（主打 aggr.trade + TradingView） |
+| 核心流程 | 截图 → 后端 AI 视觉分析 → 本地存储报告 → 弹出面板展示报告 → 一键分享 |
+| 开发者 | fei |
+| 域名 | candlebot.app |
+| github仓库 | https://github.com/brickhu/candlebot |
+
+---
+
+## 技术栈
+
+### 前端（Chrome 扩展）
+
+- **框架**：Solid.js + Vite
+- **样式**：TailwindCSS 4.X （dark theme，自定义色板）
+- **构建插件**：`@crxjs/vite-plugin`
+- **语言**：JavaScript
+
+### 官网 （使用Solidjs开发Github Pages的静态网页）
+
+- **框架**：Solid.js + Vite
+- **样式**：TailwindCSS 4.X （dark theme，自定义色板）
+- **构建插件**：`@crxjs/vite-plugin`
+- **语言**：JavaScript
+
+### 后端
+
+- **框架**：FastAPI（Python）
+- **部署**：Railway（已上线）
+- **AI 模型**：Minimax MiniMax-Text-01，Anthropic 兼容 API 格式（`x-api-key` 头）, 保留其他大模型的配置；
+- **限流**：每 IP 每天 5 次免费（内存存储，重启清零）
+
+---
+
+## 仓库结构
+
+```
+candlebot/
+├── backend/       # 后端工程，存放所有后端工程代码
+├── extension/     # 浏览器插件，存放所有浏览器插件代码
+├── website/       # 应用官网，存放官网代码，通过Github Pages自动化部署
+└── .gitignore
+└── .github/       # github自动化部署相关配置
+```
+
+---
+
+## 部署信息
+
+| 项目 | 地址 |
+|------|------|
+| Railway 后端 URL | `https://candelbot-backend-production.up.railway.app` |
+| 健康检查 | `https://candelbot-backend-production.up.railway.app/health` |
+
+---
+
+## 编码规范
+
+- 语言：**默认中文沟通，代码和注释用英文**
+- 前端：JavaScript（不使用 TypeScript）
+- 样式：只用 Tailwind utility class，不写自定义 CSS（除 index.css 基础重置）
+- 组件：Solid.js 函数组件 + Signals，不用 React/Vue
+- 后端：Python，Pydantic 校验请求体，httpx 异步请求 AI API
+- 不引入非必要依赖，保持扩展体积小
+
+---
+
+## 业务构成
+
+- 浏览器扩展：项目工程位于`/extension`目录，是用户主要的交互界面，用户使用他截图并提交K线图至后端，并通过扩展查看报告，浏览历史报告等；
+- 后端: 项目工程位于`/backend`目录，响应前端分析需求，与大模型交互，以及用户管理，订单管理以及其他交易类数据的获取，存储等，他是整个项目的大脑；
+- 官网: 项目工程位于`/website`目录，官网的目的是展示和获客，提供插件下载；

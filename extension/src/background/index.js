@@ -62,4 +62,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })
     return true
   }
+
+  if (msg.type === 'OPEN_POPUP') {
+    chrome.action.openPopup()
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (msg.type === 'OPEN_DASHBOARD') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard/index.html') })
+    sendResponse({ success: true })
+    return true
+  }
 })
