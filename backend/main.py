@@ -38,28 +38,24 @@ def load_env_from_file():
             print(f"读取.env.local文件失败: {e}")
     return env_vars
 
-# 首先从.env.local文件加载环境变量
 env_from_file = load_env_from_file()
 
-# 优先使用系统环境变量，其次使用文件中的变量
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", env_from_file.get("MODEL_PROVIDER", "deepseek"))
-
-# DeepSeek配置
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", env_from_file.get("DEEPSEEK_API_KEY", ""))
-
-# Minimax配置 (Anthropic兼容API)
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", env_from_file.get("MINIMAX_API_KEY", ""))
 
-# 调试信息
 print(f"MODEL_PROVIDER: {MODEL_PROVIDER}")
 print(f"MINIMAX_API_KEY长度: {len(MINIMAX_API_KEY) if MINIMAX_API_KEY else 0}")
 print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 0}")
 
-# API端点配置
-DEEPSEEK_URL  = "https://api.deepseek.com/v1/chat/completions"
+# API 端点配置
+DEEPSEEK_URL   = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
-MINIMAX_URL   = "https://api.minimaxi.com/anthropic/v1/messages"
-MINIMAX_MODEL  = "MiniMax-M2.5"
+
+# ✅ 修复1：使用 OpenAI 兼容接口（更稳定，格式统一）
+# ✅ 修复2：MiniMax-VL-01 才是支持视觉输入的模型，M系列是纯文本
+MINIMAX_URL    = "https://api.minimaxi.com/v1/chat/completions"
+MINIMAX_MODEL  = "MiniMax-VL-01"
 
 DAILY_FREE_LIMIT = 5
 usage_store: dict = defaultdict(lambda: {"count": 0, "date": ""})
@@ -121,7 +117,13 @@ PROMPT_TV = """
 - 均线系统（MA/EMA）：多空排列、金叉死叉
 - 成交量：放量/缩量，量价配合
 - RSI/MACD（若可见）：超买超卖、背离信号
-- 支撑位与阻力位
+- 布林带（若可见）：价格位置、收窄扩张
+- 关键支撑阻力位
+
+信号规则：
+- 多指标共振 = 强信号
+- 成交量必须与价格方向配合
+- 触发条件必须量化（具体价格 + K线确认）
 
 总结评级（基于最高概率场景）：
 - ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
@@ -133,50 +135,62 @@ PROMPT_TV = """
 PROMPTS = {"aggr": PROMPT_AGGR, "tradingview": PROMPT_TV}
 
 OUTPUT_FORMAT = """
-输出格式（严格遵守）：
+## 输出格式（严格遵循，Markdown）
 
-## [交易对] · [时间周期] 分析报告
+{交易对} · {时间周期} · ${价格}
 
-### 📊 市场概况
-（当前价格、趋势方向、整体结构）
+---
 
-### 🔍 指标解读
-（逐一解读识别到的指标信号）
+## 📊 技术面信号
 
-### 🎯 三场景概率预测
-**场景A · 做多** XX%
-触发条件：...
-目标位：... | 止损位：...
+| 指标 | 当前状态 | 信号 |
+|------|---------|------|
+| K线形态 | ... | 🔴/⚫/🟢 |
+| CVD | ... | 🔴/⚫/🟢 |
+| Delta | [数值+连续根数] | 🔴/⚫/🟢 |
+| 成交量 | ... | 🔴/⚫/🟢 |
+| VWAP | ... | 🔴/⚫/🟢 |
+| 关键支撑 | $X,XXX（原因） | — |
+| 关键阻力 | $X,XXX（原因） | — |
 
-**场景B · 做空** XX%
-触发条件：...
-目标位：... | 止损位：...
+---
 
-**场景C · 观望** XX%
-（三个场景概率之和必须等于100%）
+## 🎯 概率预测
 
-### ⚡ 操作建议
-（具体、可执行的建议）
+**场景A（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+**场景B（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+**场景C（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+---
+
+## 总结
+
+[评级标签]：[100字以内，简洁直接]
 
 ---
 METADATA
-RATING:[评级文字，如 🟢🟢🟢做多良机]
-RATING_SCORE:[主要场景概率数字，如 75]
-SUMMARY:[一句话摘要，15字以内]
-PAIR:[交易对，如 BTC/USDT]
+RATING:[评级文字，如🟢🟢🟢做多良机]
+RATING_SCORE:[整数，-3到3]
+SUMMARY:[总结正文，不含评级标签，100字以内]
+PAIR:[交易对，如ETHUSD]
 PRICE:[当前价格数字]
-TIMEFRAME:[时间周期，如 15m]
+TIMEFRAME:[时间周期，如15m]
 """
 
 
 class AnalyzeRequest(BaseModel):
     image_base64: str
-    platform: str = "aggr"
+    platform: str = "tradingview"
     lang: str = "zh"
 
 
 @app.get("/health")
-def health():
+async def health():
     return {
         "status": "ok",
         "provider": MODEL_PROVIDER,
@@ -187,13 +201,14 @@ def health():
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest, request: Request):
     ip = request.client.host
-    ok, remaining = check_and_increment(ip)
-    if not ok:
+    allowed, remaining = check_and_increment(ip)
+
+    if not allowed:
         raise HTTPException(
             status_code=429,
             detail={
-                "error": "daily_limit_reached",
-                "message": "今日免费次数已用完（5次/天），明天再来吧。",
+                "error": "daily_limit_exceeded",
+                "message": "今日免费次数已用完（5次/天），请明日再试",
                 "message_en": "Daily free limit reached (5/day). Try again tomorrow."
             }
         )
@@ -207,24 +222,22 @@ async def analyze(req: AnalyzeRequest, request: Request):
         api_key = MINIMAX_API_KEY
         model = MINIMAX_MODEL
 
-        print(f"使用Minimax提供商")
+        print(f"使用Minimax提供商: {model}")
         print(f"API Key长度: {len(api_key) if api_key else 0}")
-        print(f"API URL: {api_url}")
-        print(f"模型: {model}")
+        print(f"image_base64长度: {len(req.image_base64) if req.image_base64 else 0}")
 
-        # ✅ 修复：Minimax Anthropic兼容层使用 url 格式传图，不支持 base64 source
+        # ✅ OpenAI 兼容格式，image_url 传 base64 Data URL
         payload = {
             "model": model,
             "max_tokens": 3000,
-            "system": system_prompt,
             "messages": [
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image",
-                            "source": {
-                                "type": "url",
+                            "type": "image_url",
+                            "image_url": {
                                 "url": f"data:image/png;base64,{req.image_base64}"
                             }
                         },
@@ -237,10 +250,10 @@ async def analyze(req: AnalyzeRequest, request: Request):
             ]
         }
 
+        # ✅ OpenAI 兼容接口使用 Bearer token
         headers = {
-            "x-api-key": api_key,
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01"
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
         }
 
     else:
@@ -278,34 +291,19 @@ async def analyze(req: AnalyzeRequest, request: Request):
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(api_url, json=payload, headers=headers)
+
+            # 打印原始响应便于调试
+            print(f"HTTP状态码: {resp.status_code}")
+            try:
+                resp_preview = json.dumps(resp.json(), indent=2, ensure_ascii=False)[:800]
+                print(f"响应内容预览: {resp_preview}")
+            except Exception:
+                print(f"响应文本: {resp.text[:500]}")
+
             resp.raise_for_status()
 
-            raw = ""
-            if MODEL_PROVIDER == "minimax":
-                # Anthropic格式响应
-                response_data = resp.json()
-                print(f"Minimax响应数据: {json.dumps(response_data, indent=2, ensure_ascii=False)[:500]}...")
-
-                if "content" in response_data:
-                    for item in response_data["content"]:
-                        if item.get("type") == "text" and "text" in item:
-                            raw = item["text"]
-                            break
-
-                if not raw:
-                    if response_data.get("content") and len(response_data["content"]) > 0:
-                        for item in response_data["content"]:
-                            if "text" in item:
-                                raw = item["text"]
-                                break
-                            elif "thinking" in item:
-                                raw = item["thinking"]
-                                break
-                    if not raw:
-                        raw = str(response_data)
-            else:
-                # OpenAI格式响应
-                raw = resp.json()["choices"][0]["message"]["content"]
+            # OpenAI 兼容格式解析（Minimax 和 DeepSeek 统一）
+            raw = resp.json()["choices"][0]["message"]["content"]
 
         meta = {}
         for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
@@ -323,7 +321,12 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
     except httpx.HTTPStatusError as e:
         provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
-        raise HTTPException(status_code=502, detail=f"{provider_name} API 错误: {e.response.status_code}")
+        error_body = e.response.text[:300]
+        print(f"{provider_name} API 错误 {e.response.status_code}: {error_body}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"{provider_name} API 错误: {e.response.status_code} - {error_body}"
+        )
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
