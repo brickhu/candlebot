@@ -234,8 +234,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": f"[Image base64:{req.image_base64}]
-请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
+                    "content": f"[Image base64:{req.image_base64}]\n请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
                 }
             ]
         }
