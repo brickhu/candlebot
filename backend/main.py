@@ -52,10 +52,10 @@ print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 
 DEEPSEEK_URL   = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
 
-# ✅ 修复1：使用 OpenAI 兼容接口（更稳定，格式统一）
-# ✅ 修复2：MiniMax-VL-01 才是支持视觉输入的模型，M系列是纯文本
+# MiniMax-Text-01 是支持视觉理解的模型（VL-01 是开源权重名，API 平台不识别）
+# 图片通过 [Image base64:xxx] 嵌入文本传递，不是标准 image_url 格式
 MINIMAX_URL    = "https://api.minimaxi.com/v1/chat/completions"
-MINIMAX_MODEL  = "MiniMax-VL-01"
+MINIMAX_MODEL  = "MiniMax-Text-01"
 
 DAILY_FREE_LIMIT = 5
 usage_store: dict = defaultdict(lambda: {"count": 0, "date": ""})
@@ -226,7 +226,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         print(f"API Key长度: {len(api_key) if api_key else 0}")
         print(f"image_base64长度: {len(req.image_base64) if req.image_base64 else 0}")
 
-        # ✅ OpenAI 兼容格式，image_url 传 base64 Data URL
+        # ✅ MiniMax 官方视觉格式：图片用 [Image base64:xxx] 嵌入到 user 文本中
         payload = {
             "model": model,
             "max_tokens": 3000,
@@ -234,18 +234,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{req.image_base64}"
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                        }
-                    ]
+                    "content": f"[Image base64:{req.image_base64}]
+请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
                 }
             ]
         }
