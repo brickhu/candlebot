@@ -1,8 +1,34 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Tailwind 4.0 Theme Configuration */
+@theme {
+  /* Colors */
+  --color-bg: #0B1F17;
+  --color-bg-2: #0F2A1E;
+  --color-bg-3: #142F22;
+  --color-surface: #1A3D2B;
+  --color-border: #2A5240;
+  --color-green: #7EC8A4;
+  --color-green-2: #5BAF87;
+  --color-gold: #D4A86A;
+  --color-gold-2: #C49555;
+  --color-text: #E8F5EE;
+  --color-muted: #7A9E8A;
+
+  /* Font Families */
+  --font-mono: "Space Mono", monospace;
+  --font-display: "DM Serif Display", serif;
+  --font-body: "DM Sans", sans-serif;
+
+  /* Animations */
+  --animation-fade-up: fadeUp 0.7s ease forwards;
+  --animation-fade-in: fadeIn 0.5s ease forwards;
+  --animation-candle: candleFloat 3s ease-in-out infinite;
+  --animation-glow-pulse: glowPulse 2s ease-in-out infinite;
+  --animation-scan: scan 8s linear infinite;
+}
 
 @layer base {
   * {
@@ -14,21 +40,21 @@
   body {
     margin: 0;
     padding: 0;
-    background: #0B1F17;
-    color: #E8F5EE;
+    background: var(--color-bg);
+    color: var(--color-text);
   }
   ::selection {
     background: rgba(126, 200, 164, 0.25);
-    color: #E8F5EE;
+    color: var(--color-text);
   }
   ::-webkit-scrollbar {
     width: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0B1F17;
+    background: var(--color-bg);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2A5240;
+    background: var(--color-border);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
