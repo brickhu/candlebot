@@ -1,7 +1,6 @@
 // src/popup/Popup.jsx
 import { createSignal, createEffect, Show } from 'solid-js'
 
-// ← 部署 Railway 后替换为你的真实 URL
 const API_BASE = 'https://candelbot-backend-production.up.railway.app'
 
 function ratingClass(score) {
@@ -23,6 +22,46 @@ function parseMarkdown(md) {
     })
     .replace(/(<tr>[\s\S]*?<\/tr>\n?)+/g, m => `<table class="w-full border-collapse my-2">${m}</table>`)
     .replace(/^(?!<[ht]|$)(.+)$/gm, '<p class="text-xs text-text/70 leading-relaxed my-1">$1</p>')
+}
+
+/**
+ * 压缩图片：限制最大宽度，转为 JPEG，控制体积在 500KB 以内
+ * K线图字号小，保持足够宽度（1280px）确保文字可读
+ */
+function compressImage(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const MAX_WIDTH = 1280
+      const quality = 0.85
+
+      let w = img.width
+      let h = img.height
+
+      // 等比缩放，超过 MAX_WIDTH 才缩
+      if (w > MAX_WIDTH) {
+        h = Math.round(h * MAX_WIDTH / w)
+        w = MAX_WIDTH
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, w, h)
+
+      const compressed = canvas.toDataURL('image/jpeg', quality)
+
+      // 调试：打印压缩前后大小
+      const before = Math.round(dataUrl.length * 0.75 / 1024)
+      const after = Math.round(compressed.length * 0.75 / 1024)
+      console.log(`[Candlebot] 图片压缩: ${before}KB → ${after}KB (${w}x${h})`)
+
+      resolve(compressed)
+    }
+    img.src = dataUrl
+  })
 }
 
 export default function Popup() {
@@ -55,11 +94,12 @@ export default function Popup() {
       return
     }
 
-    const dataUrl = captureRes.dataUrl
-    setScreenshot(dataUrl)
+    // ✅ 压缩图片后再展示和上传
+    const compressed = await compressImage(captureRes.dataUrl)
+    setScreenshot(compressed)
     setState('analyzing')
 
-    const base64 = dataUrl.replace(/^data:image\/png;base64,/, '')
+    const base64 = compressed.replace(/^data:image\/jpeg;base64,/, '')
 
     try {
       const resp = await fetch(`${API_BASE}/analyze`, {
@@ -106,7 +146,6 @@ export default function Popup() {
 
   const meta = () => result()?.meta || {}
   const rc = () => ratingClass(meta().rating_score)
-
   const t = (zh, en) => lang() === 'zh' ? zh : en
 
   return (
