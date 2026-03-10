@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:oauth": "echo '打开 test-oauth.html 文件测试OAuth配置'"
   },
   "dependencies": {
     "solid-js": "^1.8.17",

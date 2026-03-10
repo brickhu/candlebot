@@ -35,7 +35,7 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "permissions": ["activeTab", "storage", "tabs", "scripting", "identity"],
   "host_permissions": [
     "*://aggr.trade/*",
     "*://*.aggr.trade/*",

@@ -9,6 +9,7 @@ function LoginPage() {
   const [isLogin, setIsLogin] = createSignal(true)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal('')
+  const [oauthLoading, setOauthLoading] = createSignal('')
 
   // 表单数据
   const [formData, setFormData] = createSignal({
@@ -96,6 +97,30 @@ function LoginPage() {
       username: '',
       confirmPassword: ''
     })
+  }
+
+  // 处理第三方登录
+  const handleOAuthLogin = async (provider) => {
+    setOauthLoading(provider)
+    setError('')
+
+    try {
+      const result = await auth.loginWithOAuth(provider)
+
+      if (result.success) {
+        if (!result.pending) {
+          // 登录成功，跳转到首页
+          navigate('/')
+        }
+        // 如果是pending状态，用户已被重定向到OAuth页面
+      } else {
+        setError(result.error || `${provider}登录失败`)
+      }
+    } catch (err) {
+      setError(err.message || `${provider}登录失败`)
+    } finally {
+      setOauthLoading('')
+    }
   }
 
   return (
@@ -227,15 +252,39 @@ function LoginPage() {
               <span class="divider-text">或</span>
             </div>
 
-            {/* 第三方登录（占位） */}
+            {/* 第三方登录 */}
             <div class="social-login">
-              <button type="button" class="btn btn-outline w-full" disabled>
-                <span class="social-icon">G</span>
-                <span>使用 Google 登录</span>
+              <button
+                type="button"
+                class="btn btn-outline w-full"
+                onClick={() => handleOAuthLogin('google')}
+                disabled={loading() || oauthLoading() === 'google'}
+              >
+                <Show when={oauthLoading() === 'google'} fallback={
+                  <>
+                    <span class="social-icon">G</span>
+                    <span>使用 Google 登录</span>
+                  </>
+                }>
+                  <span class="loading-spinner-small"></span>
+                  <span>Google登录中...</span>
+                </Show>
               </button>
-              <button type="button" class="btn btn-outline w-full mt-2" disabled>
-                <span class="social-icon">GitHub</span>
-                <span>使用 GitHub 登录</span>
+              <button
+                type="button"
+                class="btn btn-outline w-full mt-2"
+                onClick={() => handleOAuthLogin('github')}
+                disabled={loading() || oauthLoading() === 'github'}
+              >
+                <Show when={oauthLoading() === 'github'} fallback={
+                  <>
+                    <span class="social-icon">GitHub</span>
+                    <span>使用 GitHub 登录</span>
+                  </>
+                }>
+                  <span class="loading-spinner-small"></span>
+                  <span>GitHub登录中...</span>
+                </Show>
               </button>
             </div>
           </form>

@@ -3,7 +3,25 @@ import { createContext, createSignal, useContext, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 
 // API配置
-const API_BASE = 'https://candelbot-backend-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://candelbot-backend-production.up.railway.app'
+
+// OAuth配置
+const OAUTH_CONFIG = {
+  google: {
+    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    redirectUri: chrome.identity ? chrome.identity.getRedirectURL('oauth2') : `${window.location.origin}/oauth/callback`,
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    scope: 'profile email',
+    responseType: 'code'
+  },
+  github: {
+    clientId: import.meta.env.VITE_GITHUB_CLIENT_ID || '',
+    redirectUri: chrome.identity ? chrome.identity.getRedirectURL('oauth2') : `${window.location.origin}/oauth/callback`,
+    authUrl: 'https://github.com/login/oauth/authorize',
+    scope: 'user:email',
+    responseType: 'code'
+  }
+}
 
 // 创建上下文
 const AuthContext = createContext()
@@ -171,6 +189,130 @@ export function AuthProvider(props) {
     }
   }
 
+  // OAuth登录
+  const loginWithOAuth = async (provider) => {
+    try {
+      const config = OAUTH_CONFIG[provider]
+      if (!config) {
+        throw new Error(`不支持的登录方式: ${provider}`)
+      }
+
+      // 生成并存储state token
+      const stateToken = generateStateToken()
+      sessionStorage.setItem(`oauth_state_${provider}`, stateToken)
+
+      // 构建OAuth授权URL
+      const authUrl = new URL(config.authUrl)
+      authUrl.searchParams.append('client_id', config.clientId)
+      authUrl.searchParams.append('redirect_uri', config.redirectUri)
+      authUrl.searchParams.append('response_type', config.responseType)
+      authUrl.searchParams.append('scope', config.scope)
+      authUrl.searchParams.append('state', stateToken)
+
+      // 在Chrome扩展中使用chrome.identity.launchWebAuthFlow
+      if (chrome.identity && chrome.identity.launchWebAuthFlow) {
+        return new Promise((resolve, reject) => {
+          chrome.identity.launchWebAuthFlow({
+            url: authUrl.toString(),
+            interactive: true
+          }, (redirectUrl) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message))
+              return
+            }
+
+            if (!redirectUrl) {
+              reject(new Error('授权流程被取消'))
+              return
+            }
+
+            // 从重定向URL中提取授权码
+            const url = new URL(redirectUrl)
+            const code = url.searchParams.get('code')
+            const receivedState = url.searchParams.get('state')
+            const error = url.searchParams.get('error')
+
+            if (error) {
+              reject(new Error(`OAuth错误: ${error}`))
+              return
+            }
+
+            if (!code) {
+              reject(new Error('未收到授权码'))
+              return
+            }
+
+            // 验证state token防止CSRF攻击
+            const storedState = sessionStorage.getItem(`oauth_state_${provider}`)
+            sessionStorage.removeItem(`oauth_state_${provider}`)
+
+            if (!storedState || storedState !== receivedState) {
+              reject(new Error('安全验证失败，请重试'))
+              return
+            }
+
+            // 使用授权码交换token
+            exchangeCodeForToken(provider, code, config.redirectUri)
+              .then(resolve)
+              .catch(reject)
+          })
+        })
+      } else {
+        // 在Web环境中直接重定向
+        window.location.href = authUrl.toString()
+        return { success: true, pending: true }
+      }
+    } catch (error) {
+      console.error(`${provider}登录错误:`, error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // 使用授权码交换token
+  const exchangeCodeForToken = async (provider, code, redirectUri) => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/oauth/${provider}/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code,
+          redirect_uri: redirectUri
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Token交换失败')
+      }
+
+      const data = await response.json()
+      const authToken = data.access_token
+
+      // 保存token
+      setToken(authToken)
+      chrome.storage.local.set({
+        auth_token: authToken
+      })
+
+      // 获取用户信息
+      await fetchUserInfo(authToken)
+
+      return { success: true }
+    } catch (error) {
+      console.error('Token交换错误:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // 生成state token防止CSRF攻击
+  const generateStateToken = () => {
+    const array = new Uint8Array(32)
+    window.crypto.getRandomValues(array)
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
   // 登出
   const logout = () => {
     chrome.storage.local.remove(['auth_token', 'user_info'])
@@ -255,6 +397,7 @@ export function AuthProvider(props) {
     login,
     loginJson,
     register,
+    loginWithOAuth,
     logout,
     updateUser,
     refreshUserQuota

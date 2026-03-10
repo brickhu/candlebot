@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth配置测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Railway Auth OAuth配置测试</h1>
+
+    <div class="test-section">
+        <h2>环境变量检查</h2>
+        <button onclick="checkEnvVars()">检查环境变量</button>
+        <div id="envResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Google OAuth配置测试</h2>
+        <p>Client ID: <code id="googleClientId">未配置</code></p>
+        <button onclick="testGoogleOAuth()" id="googleBtn" disabled>测试Google OAuth</button>
+        <div id="googleResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>GitHub OAuth配置测试</h2>
+        <p>Client ID: <code id="githubClientId">未配置</code></p>
+        <button onclick="testGitHubOAuth()" id="githubBtn" disabled>测试GitHub OAuth</button>
+        <div id="githubResult" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>API端点测试</h2>
+        <button onclick="testApiEndpoints()">测试API端点</button>
+        <div id="apiResult" class="test-result"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `test-result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function checkEnvVars() {
+            const env = {
+                VITE_GOOGLE_CLIENT_ID: import.meta.env?.VITE_GOOGLE_CLIENT_ID || process.env?.VITE_GOOGLE_CLIENT_ID,
+                VITE_GITHUB_CLIENT_ID: import.meta.env?.VITE_GITHUB_CLIENT_ID || process.env?.VITE_GITHUB_CLIENT_ID,
+                VITE_API_BASE: import.meta.env?.VITE_API_BASE || process.env?.VITE_API_BASE
+            };
+
+            // 更新显示
+            document.getElementById('googleClientId').textContent = env.VITE_GOOGLE_CLIENT_ID || '未配置';
+            document.getElementById('githubClientId').textContent = env.VITE_GITHUB_CLIENT_ID || '未配置';
+
+            // 启用/禁用按钮
+            document.getElementById('googleBtn').disabled = !env.VITE_GOOGLE_CLIENT_ID;
+            document.getElementById('githubBtn').disabled = !env.VITE_GITHUB_CLIENT_ID;
+
+            let message = '';
+            let type = 'success';
+
+            if (!env.VITE_GOOGLE_CLIENT_ID && !env.VITE_GITHUB_CLIENT_ID) {
+                message = '❌ 未配置任何OAuth Client ID。请参考RAILWAY_AUTH_SETUP.md进行配置。';
+                type = 'error';
+            } else if (!env.VITE_GOOGLE_CLIENT_ID) {
+                message = '⚠️ 已配置GitHub OAuth，但未配置Google OAuth。';
+                type = 'warning';
+            } else if (!env.VITE_GITHUB_CLIENT_ID) {
+                message = '⚠️ 已配置Google OAuth，但未配置GitHub OAuth。';
+                type = 'warning';
+            } else {
+                message = '✅ 环境变量配置正确。';
+                type = 'success';
+            }
+
+            message += `\n\n配置详情：`;
+            message += `\n• Google Client ID: ${env.VITE_GOOGLE_CLIENT_ID ? '已配置' : '未配置'}`;
+            message += `\n• GitHub Client ID: ${env.VITE_GITHUB_CLIENT_ID ? '已配置' : '未配置'}`;
+            message += `\n• API Base: ${env.VITE_API_BASE || '使用默认值'}`;
+
+            showResult('envResult', message, type);
+        }
+
+        function testGoogleOAuth() {
+            const clientId = import.meta.env?.VITE_GOOGLE_CLIENT_ID || process.env?.VITE_GOOGLE_CLIENT_ID;
+            if (!clientId) {
+                showResult('googleResult', '❌ Google Client ID未配置', 'error');
+                return;
+            }
+
+            // 构建测试URL
+            const redirectUri = chrome.identity ? chrome.identity.getRedirectURL('oauth2') : `${window.location.origin}/oauth/callback`;
+            const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+            authUrl.searchParams.append('client_id', clientId);
+            authUrl.searchParams.append('redirect_uri', redirectUri);
+            authUrl.searchParams.append('response_type', 'code');
+            authUrl.searchParams.append('scope', 'profile email');
+            authUrl.searchParams.append('state', 'test_' + Date.now());
+            authUrl.searchParams.append('prompt', 'consent');
+            authUrl.searchParams.append('access_type', 'offline');
+
+            showResult('googleResult',
+                `✅ Google OAuth配置有效\n\n测试URL已生成：\n${authUrl.toString().substring(0, 100)}...\n\n注意：这只是一个配置测试，不会实际发起OAuth流程。`,
+                'success');
+        }
+
+        function testGitHubOAuth() {
+            const clientId = import.meta.env?.VITE_GITHUB_CLIENT_ID || process.env?.VITE_GITHUB_CLIENT_ID;
+            if (!clientId) {
+                showResult('githubResult', '❌ GitHub Client ID未配置', 'error');
+                return;
+            }
+
+            // 构建测试URL
+            const redirectUri = chrome.identity ? chrome.identity.getRedirectURL('oauth2') : `${window.location.origin}/oauth/callback`;
+            const authUrl = new URL('https://github.com/login/oauth/authorize');
+            authUrl.searchParams.append('client_id', clientId);
+            authUrl.searchParams.append('redirect_uri', redirectUri);
+            authUrl.searchParams.append('scope', 'user:email');
+
+            showResult('githubResult',
+                `✅ GitHub OAuth配置有效\n\n测试URL已生成：\n${authUrl.toString()}\n\n注意：这只是一个配置测试，不会实际发起OAuth流程。`,
+                'success');
+        }
+
+        async function testApiEndpoints() {
+            const apiBase = import.meta.env?.VITE_API_BASE || process.env?.VITE_API_BASE || 'https://candelbot-backend-production.up.railway.app';
+
+            showResult('apiResult', '正在测试API端点...', 'warning');
+
+            try {
+                // 测试基础API连接
+                const response = await fetch(apiBase);
+                let message = '';
+
+                if (response.ok) {
+                    message += `✅ API服务器可访问 (${response.status})\n`;
+                } else {
+                    message += `⚠️ API服务器返回状态码: ${response.status}\n`;
+                }
+
+                // 测试健康检查端点（如果存在）
+                try {
+                    const healthResponse = await fetch(`${apiBase}/health`);
+                    if (healthResponse.ok) {
+                        message += `✅ 健康检查端点正常\n`;
+                    }
+                } catch {
+                    message += `⚠️ 健康检查端点不可用\n`;
+                }
+
+                // 测试认证端点
+                const authEndpoints = [
+                    '/auth/login',
+                    '/auth/register',
+                    '/auth/me'
+                ];
+
+                for (const endpoint of authEndpoints) {
+                    try {
+                        const testResponse = await fetch(`${apiBase}${endpoint}`, {
+                            method: 'HEAD'
+                        });
+                        message += `✅ ${endpoint} 端点存在\n`;
+                    } catch {
+                        message += `⚠️ ${endpoint} 端点可能不存在\n`;
+                    }
+                }
+
+                message += `\nAPI基础地址: ${apiBase}`;
+                showResult('apiResult', message, 'success');
+
+            } catch (error) {
+                showResult('apiResult', `❌ API测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动检查环境变量
+        window.addEventListener('DOMContentLoaded', checkEnvVars);
+    </script>
+</body>
+</html>
