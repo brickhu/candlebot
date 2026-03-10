@@ -39,4 +39,28 @@ fi
 
 # 启动服务
 echo "启动 FastAPI 服务..."
-exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
+
+# 处理端口参数
+PORT=${PORT:-8000}
+
+# 验证端口是否为有效数字
+if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+    echo "错误: PORT 环境变量 '$PORT' 不是有效整数"
+    echo "使用默认端口: 8000"
+    PORT=8000
+fi
+
+# 确保端口在有效范围内
+if [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+    echo "错误: 端口 $PORT 不在有效范围内 (1-65535)"
+    echo "使用默认端口: 8000"
+    PORT=8000
+fi
+
+echo "监听端口: $PORT"
+
+if [ "$ENVIRONMENT" = "development" ]; then
+    exec uvicorn main:app --host 0.0.0.0 --port "$PORT" --reload
+else
+    exec uvicorn main:app --host 0.0.0.0 --port "$PORT"
+fi
