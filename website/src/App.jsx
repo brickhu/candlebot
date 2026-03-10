@@ -1,5 +1,5 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js'
-import { translations, detectLang } from './i18n/translations'
+import { translations, detectLang, saveLang } from './i18n/translations'
 
 // ─── Candlebot SVG Logo ───────────────────────────────────────────────────────
 function CandlebotLogo({ size = 40, dark = true }) {
@@ -455,9 +455,17 @@ export default function App() {
   const [lang, setLang] = createSignal(detectLang())
   const t = createMemo(() => translations[lang()])
 
+  // 包装setLang函数，保存用户选择
+  const setLangAndSave = (newLang) => {
+    if (newLang === 'zh' || newLang === 'en') {
+      setLang(newLang)
+      saveLang(newLang)
+    }
+  }
+
   return (
     <div class="min-h-screen bg-bg text-text font-body">
-      <Nav lang={lang} setLang={setLang} t={t()} />
+      <Nav lang={lang} setLang={setLangAndSave} t={t()} />
       <Hero lang={lang} t={t()} />
       <Features t={t()} />
       <HowItWorks t={t()} />

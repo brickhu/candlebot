@@ -229,6 +229,29 @@ export const translations = {
 }
 
 export function detectLang() {
-  const lang = navigator.language || navigator.languages?.[0] || 'en'
-  return lang.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  // 1. 首先检查本地存储中是否有用户选择的语言
+  const savedLang = localStorage.getItem('candlebot-lang')
+  if (savedLang === 'zh' || savedLang === 'en') {
+    return savedLang
+  }
+
+  // 2. 如果没有保存的语言，检测浏览器语言
+  let browserLang = 'en'
+  if (typeof navigator !== 'undefined') {
+    const languages = navigator.languages || [navigator.language]
+    for (const lang of languages) {
+      if (lang && lang.toLowerCase().startsWith('zh')) {
+        browserLang = 'zh'
+        break
+      }
+    }
+  }
+
+  return browserLang
+}
+
+export function saveLang(lang) {
+  if (typeof localStorage !== 'undefined' && (lang === 'zh' || lang === 'en')) {
+    localStorage.setItem('candlebot-lang', lang)
+  }
 }

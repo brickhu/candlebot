@@ -51,6 +51,17 @@ function useAuth() {
   }
 }
 
+// 语言检测和存储函数
+function detectBrowserLang() {
+  const languages = navigator.languages || [navigator.language]
+  for (const lang of languages) {
+    if (lang && lang.toLowerCase().startsWith('zh')) {
+      return 'zh'
+    }
+  }
+  return 'en'
+}
+
 // 分析功能
 function useAnalysis() {
   const auth = useAuth()
@@ -62,10 +73,23 @@ function useAnalysis() {
   const [screenshot, setScreenshot] = createSignal(null)
   const [copied, setCopied] = createSignal(false)
 
-  // 获取当前平台
+  // 获取当前平台和加载语言偏好
   createEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_PLATFORM' }, res => {
       setPlatform(res?.platform ?? null)
+    })
+
+    // 加载保存的语言偏好
+    chrome.storage.local.get(['candlebot_lang'], (result) => {
+      if (result.candlebot_lang && (result.candlebot_lang === 'zh' || result.candlebot_lang === 'en')) {
+        setLang(result.candlebot_lang)
+      } else {
+        // 如果没有保存的语言，检测浏览器语言
+        const browserLang = detectBrowserLang()
+        setLang(browserLang)
+        // 保存检测到的语言
+        chrome.storage.local.set({ candlebot_lang: browserLang })
+      }
     })
   })
 
@@ -189,10 +213,18 @@ function useAnalysis() {
     } catch {}
   }
 
+  // 包装setLang函数，保存用户选择
+  const setLangAndSave = (newLang) => {
+    if (newLang === 'zh' || newLang === 'en') {
+      setLang(newLang)
+      chrome.storage.local.set({ candlebot_lang: newLang })
+    }
+  }
+
   return {
     platform,
     lang,
-    setLang,
+    setLang: setLangAndSave,
     state,
     result,
     errorMsg,
