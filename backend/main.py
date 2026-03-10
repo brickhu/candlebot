@@ -334,7 +334,7 @@ async def analyze(
                 "raw": raw,
                 "lang": req.lang
             },
-            metadata=meta
+            analysis_metadata=meta
         )
         db.add(db_record)
         db.commit()

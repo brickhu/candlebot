@@ -28,13 +28,13 @@ CREATE TABLE analysis_records (
     image_hash VARCHAR(64),         -- 图片哈希（去重）
     image_data TEXT,                -- base64编码的图片（可选存储）
     report_data JSONB NOT NULL,     -- 完整的报告数据
-    metadata JSONB NOT NULL,        -- 元数据：rating, pair, price等
+    analysis_metadata JSONB NOT NULL,        -- 元数据：rating, pair, price等
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- 索引
     INDEX idx_user_created (user_id, created_at DESC),
     INDEX idx_platform (platform),
-    INDEX idx_pair (metadata->>'pair')
+    INDEX idx_pair (analysis_metadata->>'pair')
 );
 
 -- 对话记录表
@@ -59,7 +59,7 @@ CREATE TABLE payment_records (
     plan_type VARCHAR(50) NOT NULL,
     quota_added INTEGER NOT NULL,    -- 增加的配额
     status VARCHAR(50) DEFAULT 'pending',  -- pending/success/failed/refunded
-    metadata JSONB DEFAULT '{}',
+    payment_metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP WITH TIME ZONE,
 

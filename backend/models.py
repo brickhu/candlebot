@@ -41,7 +41,7 @@ class AnalysisRecord(Base):
     image_hash = Column(String(64))  # 图片哈希（去重）
     image_data = Column(Text)        # base64编码的图片（可选存储）
     report_data = Column(JSON, nullable=False)  # 完整的报告数据
-    metadata = Column(JSON, nullable=False)     # 元数据：rating, pair, price等
+    analysis_metadata = Column(JSON, nullable=False)     # 元数据：rating, pair, price等
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
@@ -75,7 +75,7 @@ class PaymentRecord(Base):
     plan_type = Column(String(50), nullable=False)
     quota_added = Column(Integer, nullable=False)  # 增加的配额
     status = Column(String(50), default="pending")  # pending/success/failed/refunded
-    metadata = Column(JSON, default=dict)
+    payment_metadata = Column(JSON, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
 

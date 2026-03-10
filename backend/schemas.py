@@ -77,7 +77,7 @@ class AnalysisMetadata(BaseModel):
 class AnalysisRecordBase(BaseModel):
     platform: str
     image_hash: Optional[str] = None
-    metadata: AnalysisMetadata
+    analysis_metadata: AnalysisMetadata
 
 
 class AnalysisRecordCreate(AnalysisRecordBase):
@@ -166,7 +166,7 @@ class AnalyzeRequest(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     report: str
-    meta: AnalysisMetadata
+    analysis_metadata: AnalysisMetadata
     remaining_today: int
     platform: str
     record_id: Optional[int] = None  # 新增：分析记录ID

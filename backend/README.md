@@ -101,7 +101,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
    - id, email, password_hash, plan_type, quota_total, quota_used, settings
 
 2. **analysis_records** - 分析记录表
-   - id, user_id, platform, image_hash, report_data, metadata, created_at
+   - id, user_id, platform, image_hash, report_data, analysis_metadata, created_at
 
 3. **conversations** - 对话表
    - id, user_id, analysis_id, messages, created_at, updated_at

@@ -46,7 +46,7 @@ async def get_conversation(
         initial_messages = [
             schemas.Message(
                 role="system",
-                content=f"这是关于{analysis.metadata.get('pair', '未知交易对')}的分析报告。用户可以对报告内容进行提问。"
+                content=f"这是关于{analysis.analysis_metadata.get('pair', '未知交易对')}的分析报告。用户可以对报告内容进行提问。"
             ).dict()
         ]
 
@@ -102,7 +102,7 @@ async def ask_question(
         initial_messages = [
             schemas.Message(
                 role="system",
-                content=f"这是关于{analysis.metadata.get('pair', '未知交易对')}的分析报告。用户可以对报告内容进行提问。"
+                content=f"这是关于{analysis.analysis_metadata.get('pair', '未知交易对')}的分析报告。用户可以对报告内容进行提问。"
             ).dict()
         ]
         conversation = models.Conversation(

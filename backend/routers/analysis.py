@@ -40,7 +40,7 @@ async def get_analysis_history(
     if platform:
         query = query.filter(models.AnalysisRecord.platform == platform)
     if pair:
-        query = query.filter(models.AnalysisRecord.metadata["pair"].astext == pair)
+        query = query.filter(models.AnalysisRecord.analysis_metadata["pair"].astext == pair)
 
     # 计算总数
     total = query.count()
@@ -177,12 +177,12 @@ async def get_analysis_stats(
 
     # 最常分析的交易对（前5）
     top_pairs = db.query(
-        models.AnalysisRecord.metadata["pair"].astext.label("pair"),
+        models.AnalysisRecord.analysis_metadata["pair"].astext.label("pair"),
         func.count(models.AnalysisRecord.id).label("count")
     ).filter(
         models.AnalysisRecord.user_id == current_user.id,
-        models.AnalysisRecord.metadata["pair"].isnot(None)
-    ).group_by(models.AnalysisRecord.metadata["pair"].astext) \
+        models.AnalysisRecord.analysis_metadata["pair"].isnot(None)
+    ).group_by(models.AnalysisRecord.analysis_metadata["pair"].astext) \
      .order_by(func.count(models.AnalysisRecord.id).desc()) \
      .limit(5) \
      .all()
