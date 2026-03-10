@@ -6,7 +6,13 @@ echo "启动 Candlebot 后端服务..."
 
 # 检查环境变量
 if [ -z "$DATABASE_URL" ]; then
-    echo "警告: DATABASE_URL 未设置，使用默认值"
+    echo "⚠️  警告: DATABASE_URL 环境变量未设置"
+    echo "   在 Railway 中，请确保："
+    echo "   1. 已创建 PostgreSQL 数据库服务"
+    echo "   2. 数据库服务已连接到当前应用"
+    echo "   3. Railway 会自动注入 DATABASE_URL 环境变量"
+    echo ""
+    echo "   使用本地开发默认值（仅用于测试）"
     export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/candlebot"
 fi
 
@@ -19,16 +25,25 @@ fi
 echo "检查数据库连接..."
 python -c "
 import os
+import sys
 from sqlalchemy import create_engine, text
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+print(f'数据库连接URL: {DATABASE_URL[:50]}...' if DATABASE_URL and len(DATABASE_URL) > 50 else f'数据库连接URL: {DATABASE_URL}')
+
 try:
-    engine = create_engine(os.getenv('DATABASE_URL'))
+    engine = create_engine(DATABASE_URL)
     with engine.connect() as conn:
         conn.execute(text('SELECT 1'))
-    print('数据库连接成功')
+    print('✅ 数据库连接成功')
 except Exception as e:
-    print(f'数据库连接失败: {e}')
-    print('请确保数据库服务已启动并正确配置 DATABASE_URL')
-    exit(1)
+    print(f'⚠️  数据库连接失败: {e}')
+    print('   应用将继续启动，但数据库相关功能可能不可用')
+    print('   请确保：')
+    print('   1. 数据库服务已创建并运行')
+    print('   2. DATABASE_URL 环境变量正确设置')
+    print('   3. 网络连接正常')
+    # 不退出，让应用继续启动
 "
 
 # 运行数据库迁移（如果使用Alembic）

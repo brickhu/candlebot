@@ -142,7 +142,13 @@ docker run -p 8000:8000 \
 
 ### Railway部署
 
-项目已配置 Railway 部署，只需连接 GitHub 仓库即可自动部署。
+项目已配置 Railway 部署，详细部署指南请查看 [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)。
+
+**重要步骤：**
+1. 连接 GitHub 仓库到 Railway
+2. **必须手动创建 PostgreSQL 数据库服务**
+3. Railway 会自动注入 `DATABASE_URL` 环境变量
+4. 配置其他必要的环境变量（SECRET_KEY、API密钥等）
 
 ## 环境变量
 

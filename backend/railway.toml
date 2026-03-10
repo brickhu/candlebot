@@ -7,7 +7,6 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 
 [variables]
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/candlebot"
 SECRET_KEY = "your-secret-key-change-in-production"
 MODEL_PROVIDER = "deepseek"
 DEEPSEEK_API_KEY = ""
