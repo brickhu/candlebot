@@ -1,6 +1,6 @@
 // 布局组件
 import { createSignal, Show } from 'solid-js'
-import { A, useLocation } from '@solidjs/router'
+import { useLocation } from '@solidjs/router'
 import { useAuth } from '../contexts/AuthContext'
 import Sidebar from './Sidebar'
 import Header from './Header'

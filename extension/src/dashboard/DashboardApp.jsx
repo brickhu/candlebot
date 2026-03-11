@@ -1,6 +1,6 @@
 // Dashboard 主应用组件
 import { createSignal, createEffect, Show, For } from 'solid-js'
-import { Router, Route, A } from '@solidjs/router'
+import { Router, Route } from '@solidjs/router'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { APIProvider } from './contexts/APIContext'
 import Layout from './components/Layout'
@@ -21,7 +21,7 @@ function AppContent() {
     <Show when={!auth.loading()} fallback={
       <div class="loading-container">
         <div class="loading-spinner"></div>
-        <div>加载 Candlebot Dashboard...</div>
+        <div>Candlebot加载中...</div>
       </div>
     }>
       <Show when={!error()} fallback={
@@ -33,32 +33,33 @@ function AppContent() {
           </button>
         </div>
       }>
-        <Layout>
-          <Router>
-            <Route path="/" component={() => {
-              const auth = useAuth()
-              return auth.isAuthenticated() ? <HomePage /> : <LoginPage />
-            }} />
-            <Route path="/login" component={LoginPage} />
-            <Route path="/history" component={() => {
-              const auth = useAuth()
-              return auth.isAuthenticated() ? <HistoryPage /> : <LoginPage />
-            }} />
-            <Route path="/analysis/:id" component={() => {
-              const auth = useAuth()
-              return auth.isAuthenticated() ? <AnalysisDetailPage /> : <LoginPage />
-            }} />
-            <Route path="/settings" component={() => {
-              const auth = useAuth()
-              return auth.isAuthenticated() ? <SettingsPage /> : <LoginPage />
-            }} />
-            <Route path="/billing" component={() => {
-              const auth = useAuth()
-              return auth.isAuthenticated() ? <BillingPage /> : <LoginPage />
-            }} />
-            <Route path="*" component={NotFoundPage} />
-          </Router>
-        </Layout>
+        <Router>
+          <Route path="/" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><HomePage /></Layout> : <LoginPage />
+          }} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/history" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><HistoryPage /></Layout> : <LoginPage />
+          }} />
+          <Route path="/analysis/:id" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><AnalysisDetailPage /></Layout> : <LoginPage />
+          }} />
+          <Route path="/settings" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><SettingsPage /></Layout> : <LoginPage />
+          }} />
+          <Route path="/billing" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><BillingPage /></Layout> : <LoginPage />
+          }} />
+          <Route path="*" component={() => {
+            const auth = useAuth()
+            return auth.isAuthenticated() ? <Layout><NotFoundPage /></Layout> : <NotFoundPage />
+          }} />
+        </Router>
       </Show>
     </Show>
   )

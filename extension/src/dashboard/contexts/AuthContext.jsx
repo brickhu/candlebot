@@ -3,7 +3,7 @@ import { createContext, createSignal, useContext, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 
 // API配置
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://candelbot-backend-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.candlebot.app'
 
 // OAuth配置
 const OAUTH_CONFIG = {
@@ -45,29 +45,80 @@ export function AuthProvider(props) {
 
   // 从存储加载token
   createEffect(() => {
-    chrome.storage.local.get(['auth_token', 'user_info'], (result) => {
-      if (result.auth_token) {
-        setToken(result.auth_token)
-        if (result.user_info) {
-          setUser(result.user_info)
-          setIsAuthenticated(true)
-        } else {
-          // 如果有token但没有用户信息，尝试获取用户信息
-          fetchUserInfo(result.auth_token)
+    const loadAuthData = () => {
+      let storageTimeout = null
+      let isCompleted = false
+
+      const completeLoading = () => {
+        if (!isCompleted) {
+          isCompleted = true
+          setLoading(false)
+          if (storageTimeout) {
+            clearTimeout(storageTimeout)
+          }
         }
       }
-      setLoading(false)
-    })
+
+      try {
+        // 检查chrome.storage是否可用
+        if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+          console.warn('chrome.storage.local不可用，跳过认证检查')
+          completeLoading()
+          return
+        }
+
+        // 设置超时，防止chrome.storage回调永远不会执行
+        storageTimeout = setTimeout(() => {
+          console.warn('chrome.storage.get超时，强制完成loading')
+          completeLoading()
+        }, 5000) // 5秒超时
+
+        chrome.storage.local.get(['auth_token', 'user_info'], (result) => {
+          if (chrome.runtime.lastError) {
+            console.error('chrome.storage.local.get错误:', chrome.runtime.lastError)
+            completeLoading()
+            return
+          }
+
+          if (result.auth_token) {
+            setToken(result.auth_token)
+            if (result.user_info) {
+              setUser(result.user_info)
+              setIsAuthenticated(true)
+              completeLoading()
+            } else {
+              // 如果有token但没有用户信息，尝试获取用户信息
+              // fetchUserInfo会在finally块中设置loading(false)
+              fetchUserInfo(result.auth_token)
+            }
+          } else {
+            completeLoading()
+          }
+        })
+      } catch (error) {
+        console.error('加载认证数据时出错:', error)
+        completeLoading()
+      }
+    }
+
+    // 添加延迟以确保扩展完全加载
+    setTimeout(loadAuthData, 100)
   })
 
   // 获取用户信息
   const fetchUserInfo = async (authToken) => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10秒超时
+
     try {
       const response = await fetch(`${API_BASE}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
-        }
+        },
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (response.ok) {
         const userData = await response.json()
@@ -75,18 +126,33 @@ export function AuthProvider(props) {
         setIsAuthenticated(true)
 
         // 保存到存储
-        chrome.storage.local.set({
-          user_info: userData
-        })
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({
+            user_info: userData
+          })
+        }
       } else {
         // token可能已过期，清除存储
-        chrome.storage.local.remove(['auth_token', 'user_info'])
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.remove(['auth_token', 'user_info'])
+        }
         setIsAuthenticated(false)
         setToken(null)
       }
     } catch (error) {
+      clearTimeout(timeoutId)
       console.error('获取用户信息失败:', error)
       setIsAuthenticated(false)
+
+      // 如果是网络错误，清除无效的token
+      if (error.name === 'AbortError' || error.name === 'TypeError') {
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.remove(['auth_token', 'user_info'])
+        }
+        setToken(null)
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
