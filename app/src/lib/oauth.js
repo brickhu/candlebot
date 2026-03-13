@@ -76,6 +76,30 @@ export function clearOAuthProvider() {
 
 // 获取重定向URI（根据当前环境）
 export function getRedirectUri() {
+  // 1. 优先使用环境变量配置的回调地址
+  const envRedirectUri = import.meta.env.VITE_OAUTH_REDIRECT_URI
+  if (envRedirectUri) {
+    return envRedirectUri
+  }
+
+  // 2. 根据当前环境自动选择
   const baseUrl = window.location.origin
-  return `${baseUrl}/oauth/callback`
+  const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')
+
+  if (isLocalhost) {
+    // 开发环境
+    return `${baseUrl}/oauth/callback`
+  } else {
+    // 生产环境 - 使用HTTPS
+    const protocol = baseUrl.startsWith('https') ? 'https' : 'http'
+    const domain = window.location.hostname
+
+    // 如果是IP地址，保持原样
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(domain)) {
+      return `${baseUrl}/oauth/callback`
+    }
+
+    // 否则使用当前域名
+    return `${protocol}://${domain}/oauth/callback`
+  }
 }
