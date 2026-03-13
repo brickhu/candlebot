@@ -21,6 +21,13 @@ if [ -z "$SECRET_KEY" ]; then
     export SECRET_KEY="dev-secret-key-change-in-production"
 fi
 
+# 开发环境特定配置
+if [ "$ENVIRONMENT" = "development" ] || [ "$RAILWAY_ENVIRONMENT" = "development" ]; then
+    echo "🔧 开发环境配置"
+    # 可以在这里添加开发环境特定的配置
+    export DEBUG=true
+fi
+
 # 检查数据库连接
 echo "检查数据库连接..."
 python -c "
