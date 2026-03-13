@@ -1,6 +1,7 @@
 """
 用户认证和JWT管理
 """
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -13,7 +14,7 @@ import schemas
 from database import get_db
 
 # 安全配置
-SECRET_KEY = "your-secret-key-change-in-production"  # 在生产环境中使用环境变量
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")  # 从环境变量读取
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7天
 

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth配置诊断工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .warning {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        .success {
+            background: #e8f5e8;
+            border-left-color: #4CAF50;
+        }
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.test {
+            background: #2196F3;
+        }
+        button.test:hover {
+            background: #1976D2;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+        .result.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            display: block;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OAuth配置诊断工具</h1>
+
+        <div class="section">
+            <h2>1. 环境变量检查</h2>
+            <div id="envCheck" class="info-box">
+                正在检查环境变量...
+            </div>
+            <button onclick="checkEnvironment()">检查环境变量</button>
+            <div id="envResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Chrome API检查</h2>
+            <div id="chromeApiCheck" class="info-box">
+                正在检查Chrome API...
+            </div>
+            <button onclick="checkChromeAPIs()">检查Chrome API</button>
+            <div id="chromeApiResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. Google OAuth配置检查</h2>
+            <div class="warning">
+                <strong>常见问题：</strong>
+                <ul>
+                    <li>客户端ID无效或已删除</li>
+                    <li>重定向URI不匹配</li>
+                    <li>OAuth同意屏幕未配置</li>
+                    <li>API未启用</li>
+                </ul>
+            </div>
+
+            <div id="googleConfig" class="info-box">
+                正在生成Google OAuth配置...
+            </div>
+
+            <button onclick="testGoogleOAuth()" class="test">测试Google OAuth</button>
+            <button onclick="showGoogleConfigHelp()">查看配置指南</button>
+
+            <div id="googleTestResult" class="result"></div>
+            <div id="googleConfigHelp" style="display: none;">
+                <h3>Google OAuth配置步骤：</h3>
+                <ol>
+                    <li>访问 <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a></li>
+                    <li>创建或选择项目</li>
+                    <li>点击"创建凭据" → "OAuth客户端ID"</li>
+                    <li>应用类型选择"Chrome应用"</li>
+                    <li>输入应用名称</li>
+                    <li>在"已获授权的JavaScript来源"中添加：<code>chrome-extension://扩展ID</code></li>
+                    <li>在"已获授权的重定向URI"中添加：<code id="redirectUriDisplay"></code></li>
+                    <li>点击"创建"获取客户端ID</li>
+                    <li>在OAuth同意屏幕配置应用名称和用户支持邮箱</li>
+                    <li>发布应用（测试模式仅允许100个用户）</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>4. GitHub OAuth配置检查</h2>
+            <div id="githubConfig" class="info-box">
+                正在生成GitHub OAuth配置...
+            </div>
+
+            <button onclick="testGitHubOAuth()" class="test">测试GitHub OAuth</button>
+            <button onclick="showGitHubConfigHelp()">查看配置指南</button>
+
+            <div id="githubTestResult" class="result"></div>
+            <div id="githubConfigHelp" style="display: none;">
+                <h3>GitHub OAuth配置步骤：</h3>
+                <ol>
+                    <li>访问 <a href="https://github.com/settings/developers" target="_blank">GitHub Developer Settings</a></li>
+                    <li>点击"New OAuth App"</li>
+                    <li>应用名称：Candlebot</li>
+                    <li>主页URL：<code>https://candlebot.app</code></li>
+                    <li>授权回调URL：<code id="githubRedirectUriDisplay"></code></li>
+                    <li>点击"Register application"</li>
+                    <li>复制Client ID到环境变量</li>
+                    <li>生成Client Secret（后端需要）</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section success">
+            <h2>5. 快速修复建议</h2>
+            <div id="fixSuggestions">
+                <p>根据诊断结果，这里会显示具体的修复建议。</p>
+            </div>
+            <button onclick="generateFixScript()">生成修复脚本</button>
+            <div id="fixScript" class="info-box" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取扩展ID和重定向URI
+        function getExtensionInfo() {
+            const extensionId = chrome.runtime.id;
+            const redirectUri = chrome.identity ? chrome.identity.getRedirectURL('oauth2') : 'chrome.identity不可用';
+
+            return {
+                extensionId,
+                redirectUri,
+                isChromeExtension: !!chrome.runtime.id
+            };
+        }
+
+        // 检查环境变量
+        function checkEnvironment() {
+            const env = {
+                googleClientId: import.meta.env?.VITE_GOOGLE_CLIENT_ID || '未设置',
+                githubClientId: import.meta.env?.VITE_GITHUB_CLIENT_ID || '未设置',
+                apiBase: import.meta.env?.VITE_API_BASE || '未设置'
+            };
+
+            document.getElementById('envCheck').innerHTML = `
+                Google Client ID: <strong>${env.googleClientId}</strong><br>
+                GitHub Client ID: <strong>${env.githubClientId}</strong><br>
+                API Base URL: <strong>${env.apiBase}</strong>
+            `;
+
+            const result = document.getElementById('envResult');
+            const issues = [];
+
+            if (env.googleClientId === '未设置' || !env.googleClientId) {
+                issues.push('Google Client ID未设置');
+            }
+            if (env.githubClientId === '未设置' || !env.githubClientId) {
+                issues.push('GitHub Client ID未设置');
+            }
+            if (env.apiBase === '未设置' || !env.apiBase) {
+                issues.push('API Base URL未设置');
+            }
+
+            if (issues.length > 0) {
+                result.className = 'result error';
+                result.innerHTML = `❌ 发现问题：<br>${issues.join('<br>')}`;
+            } else {
+                result.className = 'result success';
+                result.innerHTML = '✅ 环境变量配置正常';
+            }
+            result.style.display = 'block';
+
+            updateFixSuggestions();
+        }
+
+        // 检查Chrome API
+        function checkChromeAPIs() {
+            const apis = {
+                'chrome.runtime': !!chrome.runtime,
+                'chrome.runtime.id': !!chrome.runtime?.id,
+                'chrome.storage': !!chrome.storage,
+                'chrome.storage.local': !!chrome.storage?.local,
+                'chrome.identity': !!chrome.identity,
+                'chrome.identity.getRedirectURL': !!chrome.identity?.getRedirectURL,
+                'chrome.identity.launchWebAuthFlow': !!chrome.identity?.launchWebAuthFlow
+            };
+
+            let html = '<table style="width:100%;border-collapse:collapse;">';
+            for (const [api, available] of Object.entries(apis)) {
+                html += `<tr><td>${api}</td><td><strong>${available ? '✅ 可用' : '❌ 不可用'}</strong></td></tr>`;
+            }
+            html += '</table>';
+
+            document.getElementById('chromeApiCheck').innerHTML = html;
+
+            const result = document.getElementById('chromeApiResult');
+            const issues = [];
+
+            if (!apis['chrome.identity']) {
+                issues.push('chrome.identity API不可用 - 检查manifest.json权限');
+            }
+            if (!apis['chrome.identity.launchWebAuthFlow']) {
+                issues.push('chrome.identity.launchWebAuthFlow不可用');
+            }
+
+            if (issues.length > 0) {
+                result.className = 'result error';
+                result.innerHTML = `❌ 发现问题：<br>${issues.join('<br>')}`;
+            } else {
+                result.className = 'result success';
+                result.innerHTML = '✅ Chrome API正常';
+            }
+            result.style.display = 'block';
+
+            updateFixSuggestions();
+        }
+
+        // 显示Google OAuth配置
+        function showGoogleConfig() {
+            const info = getExtensionInfo();
+            const clientId = import.meta.env?.VITE_GOOGLE_CLIENT_ID || '未设置';
+            const redirectUri = info.redirectUri;
+
+            document.getElementById('googleConfig').innerHTML = `
+                <strong>客户端ID：</strong>${clientId}<br>
+                <strong>重定向URI：</strong>${redirectUri}<br>
+                <strong>扩展ID：</strong>${info.extensionId || '未加载'}
+            `;
+
+            // 显示在帮助中
+            document.getElementById('redirectUriDisplay').textContent = redirectUri;
+
+            // 检查常见问题
+            const issues = [];
+            if (clientId === '未设置') {
+                issues.push('客户端ID未设置');
+            }
+            if (!clientId.includes('.apps.googleusercontent.com')) {
+                issues.push('客户端ID格式不正确');
+            }
+            if (!redirectUri.includes('chrome-extension://')) {
+                issues.push('重定向URI不是Chrome扩展格式');
+            }
+
+            if (issues.length > 0) {
+                document.getElementById('googleConfig').className = 'info-box error';
+            }
+        }
+
+        // 测试Google OAuth
+        function testGoogleOAuth() {
+            const result = document.getElementById('googleTestResult');
+            result.className = 'result';
+            result.innerHTML = '正在测试Google OAuth...';
+            result.style.display = 'block';
+
+            const clientId = import.meta.env?.VITE_GOOGLE_CLIENT_ID;
+            const info = getExtensionInfo();
+
+            if (!clientId || !info.extensionId) {
+                result.className = 'result error';
+                result.innerHTML = '❌ 无法测试：客户端ID或扩展ID未设置';
+                return;
+            }
+
+            if (!chrome.identity || !chrome.identity.launchWebAuthFlow) {
+                result.className = 'result error';
+                result.innerHTML = '❌ chrome.identity API不可用';
+                return;
+            }
+
+            // 构建测试URL
+            const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+            authUrl.searchParams.append('client_id', clientId);
+            authUrl.searchParams.append('redirect_uri', info.redirectUri);
+            authUrl.searchParams.append('response_type', 'code');
+            authUrl.searchParams.append('scope', 'profile email');
+            authUrl.searchParams.append('access_type', 'offline');
+            authUrl.searchParams.append('prompt', 'consent');
+
+            // 添加state参数防止CSRF
+            const state = Math.random().toString(36).substring(2);
+            authUrl.searchParams.append('state', state);
+
+            console.log('测试Google OAuth URL:', authUrl.toString());
+
+            chrome.identity.launchWebAuthFlow({
+                url: authUrl.toString(),
+                interactive: true
+            }, (responseUrl) => {
+                if (chrome.runtime.lastError) {
+                    result.className = 'result error';
+                    result.innerHTML = `❌ Google OAuth错误：${chrome.runtime.lastError.message}`;
+                } else if (responseUrl) {
+                    result.className = 'result success';
+                    result.innerHTML = `✅ Google OAuth流程启动成功！<br>响应URL：${responseUrl.substring(0, 100)}...`;
+
+                    // 解析响应
+                    try {
+                        const url = new URL(responseUrl);
+                        const code = url.searchParams.get('code');
+                        const error = url.searchParams.get('error');
+
+                        if (error) {
+                            result.innerHTML += `<br>❌ OAuth错误：${error}`;
+                        } else if (code) {
+                            result.innerHTML += `<br>✅ 收到授权码：${code.substring(0, 20)}...`;
+                        }
+                    } catch (e) {
+                        result.innerHTML += `<br>⚠️ 无法解析响应URL：${e.message}`;
+                    }
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = '❌ Google OAuth流程被用户取消';
+                }
+            });
+        }
+
+        // 显示Google配置帮助
+        function showGoogleConfigHelp() {
+            document.getElementById('googleConfigHelp').style.display = 'block';
+        }
+
+        // 测试GitHub OAuth
+        function testGitHubOAuth() {
+            const result = document.getElementById('githubTestResult');
+            result.className = 'result';
+            result.innerHTML = '正在测试GitHub OAuth...';
+            result.style.display = 'block';
+
+            // 类似Google测试逻辑
+            result.className = 'result warning';
+            result.innerHTML = '⚠️ GitHub OAuth测试需要有效的Client ID';
+        }
+
+        // 显示GitHub配置帮助
+        function showGitHubConfigHelp() {
+            const info = getExtensionInfo();
+            document.getElementById('githubRedirectUriDisplay').textContent = info.redirectUri;
+            document.getElementById('githubConfigHelp').style.display = 'block';
+        }
+
+        // 更新修复建议
+        function updateFixSuggestions() {
+            const suggestions = [];
+
+            // 检查环境变量
+            const googleClientId = import.meta.env?.VITE_GOOGLE_CLIENT_ID;
+            if (!googleClientId || googleClientId === '未设置') {
+                suggestions.push('设置VITE_GOOGLE_CLIENT_ID环境变量');
+            } else if (!googleClientId.includes('.apps.googleusercontent.com')) {
+                suggestions.push('检查Google Client ID格式是否正确');
+            }
+
+            // 检查Chrome API
+            if (!chrome.identity) {
+                suggestions.push('在manifest.json中添加"identity"权限');
+            }
+
+            // 检查重定向URI
+            const info = getExtensionInfo();
+            if (info.redirectUri && !info.redirectUri.includes('chrome-extension://')) {
+                suggestions.push('检查chrome.identity.getRedirectURL()是否工作');
+            }
+
+            document.getElementById('fixSuggestions').innerHTML = suggestions.length > 0
+                ? `<ul>${suggestions.map(s => `<li>${s}</li>`).join('')}</ul>`
+                : '<p>✅ 未发现问题，请尝试测试OAuth流程</p>';
+        }
+
+        // 生成修复脚本
+        function generateFixScript() {
+            const script = `#!/bin/bash
+
+# OAuth配置修复脚本
+echo "=== OAuth配置修复 ==="
+
+# 1. 检查当前配置
+echo "1. 当前Google Client ID: ${import.meta.env?.VITE_GOOGLE_CLIENT_ID || '未设置'}"
+
+# 2. 建议步骤
+echo ""
+echo "2. 修复步骤："
+echo "   a. 访问 https://console.cloud.google.com/apis/credentials"
+echo "   b. 检查OAuth客户端ID是否有效"
+echo "   c. 确保重定向URI已添加：${getExtensionInfo().redirectUri}"
+echo "   d. 在Google Cloud Console中："
+echo "      - 进入'API和服务' > '凭据'"
+echo "      - 点击你的OAuth 2.0客户端ID"
+echo "      - 在'已获授权的重定向URI'中添加上述URI"
+echo "      - 点击保存"
+echo "   e. 如果问题依旧，尝试创建新的OAuth客户端ID"
+
+# 3. 测试命令
+echo ""
+echo "3. 测试命令："
+echo "   # 重新构建扩展"
+echo "   npm run build"
+echo ""
+echo "   # 重新加载扩展"
+echo "   # 1. 打开 chrome://extensions/"
+echo "   # 2. 点击扩展的刷新按钮"
+echo "   # 3. 重新测试OAuth"
+
+echo ""
+echo "=== 完成 ==="`;
+
+            document.getElementById('fixScript').textContent = script;
+            document.getElementById('fixScript').style.display = 'block';
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            showGoogleConfig();
+
+            // 显示GitHub配置
+            const githubClientId = import.meta.env?.VITE_GITHUB_CLIENT_ID || '未设置';
+            document.getElementById('githubConfig').innerHTML = `
+                <strong>客户端ID：</strong>${githubClientId}<br>
+                <strong>重定向URI：</strong>${getExtensionInfo().redirectUri}
+            `;
+
+            if (githubClientId === '未设置') {
+                document.getElementById('githubConfig').className = 'info-box error';
+            }
+
+            updateFixSuggestions();
+        });
+    </script>
+</body>
+</html>

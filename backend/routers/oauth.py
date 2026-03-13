@@ -11,11 +11,11 @@ import httpx
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
-# 注意：需要导入你的现有模块
-# import models
-# import schemas
-# import auth
-# from database import get_db
+# 导入现有模块
+import models
+import schemas
+import auth
+from database import get_db
 
 router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
 
@@ -269,17 +269,4 @@ async def github_oauth_callback(data: OAuthCallback, db: Session = Depends(get_d
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"服务器错误: {str(e)}")
 
-# 集成说明：
-# 1. 将此文件保存为 backend/routers/oauth.py
-# 2. 在 backend/main.py 中添加：
-#    from routers import oauth as oauth_router
-#    app.include_router(oauth_router.router)
-# 3. 修改用户模型（models.py），添加以下字段：
-#    provider = Column(String(50), nullable=True)
-#    provider_id = Column(String(255), nullable=True, index=True)
-#    oauth_metadata = Column(JSON, nullable=True)
-# 4. 将 password_hash 字段改为 nullable=True
-# 5. 在Railway中配置环境变量：
-#    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-#    GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
-# 6. 重新部署后端
+# OAuth集成已完成

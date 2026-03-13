@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { APIProvider } from './contexts/APIContext'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
+import SimpleLoginPage from './pages/SimpleLoginPage'
 import HistoryPage from './pages/HistoryPage'
 import AnalysisDetailPage from './pages/AnalysisDetailPage'
 import SettingsPage from './pages/SettingsPage'
@@ -36,24 +36,24 @@ function AppContent() {
         <Router>
           <Route path="/" component={() => {
             const auth = useAuth()
-            return auth.isAuthenticated() ? <Layout><HomePage /></Layout> : <LoginPage />
+            return auth.isAuthenticated() ? <Layout><HomePage /></Layout> : <SimpleLoginPage />
           }} />
-          <Route path="/login" component={LoginPage} />
+          <Route path="/login" component={SimpleLoginPage} />
           <Route path="/history" component={() => {
             const auth = useAuth()
-            return auth.isAuthenticated() ? <Layout><HistoryPage /></Layout> : <LoginPage />
+            return auth.isAuthenticated() ? <Layout><HistoryPage /></Layout> : <SimpleLoginPage />
           }} />
           <Route path="/analysis/:id" component={() => {
             const auth = useAuth()
-            return auth.isAuthenticated() ? <Layout><AnalysisDetailPage /></Layout> : <LoginPage />
+            return auth.isAuthenticated() ? <Layout><AnalysisDetailPage /></Layout> : <SimpleLoginPage />
           }} />
           <Route path="/settings" component={() => {
             const auth = useAuth()
-            return auth.isAuthenticated() ? <Layout><SettingsPage /></Layout> : <LoginPage />
+            return auth.isAuthenticated() ? <Layout><SettingsPage /></Layout> : <SimpleLoginPage />
           }} />
           <Route path="/billing" component={() => {
             const auth = useAuth()
-            return auth.isAuthenticated() ? <Layout><BillingPage /></Layout> : <LoginPage />
+            return auth.isAuthenticated() ? <Layout><BillingPage /></Layout> : <SimpleLoginPage />
           }} />
           <Route path="*" component={() => {
             const auth = useAuth()

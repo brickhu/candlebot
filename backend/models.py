@@ -13,7 +13,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # OAuth用户可能没有密码
     username = Column(String(100))
     avatar_url = Column(Text)
     plan_type = Column(String(50), default="free")
@@ -25,6 +25,11 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login_at = Column(DateTime(timezone=True))
     is_active = Column(Boolean, default=True)
+
+    # OAuth相关字段
+    provider = Column(String(50), nullable=True)  # google, github等
+    provider_id = Column(String(255), nullable=True, index=True)  # 第三方平台用户ID
+    oauth_metadata = Column(JSON, nullable=True)  # 原始OAuth数据
 
     # 关系
     analyses = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")

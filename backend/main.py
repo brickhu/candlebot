@@ -20,7 +20,7 @@ from database import engine, get_db
 import models
 import schemas
 import auth
-from routers import auth as auth_router, analysis as analysis_router, conversation as conversation_router
+from routers import auth as auth_router, analysis as analysis_router, conversation as conversation_router, oauth as oauth_router
 
 # 创建数据库表
 models.Base.metadata.create_all(bind=engine)
@@ -47,6 +47,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(analysis_router.router)
 app.include_router(conversation_router.router)
+app.include_router(oauth_router.router)
 
 # 环境变量配置
 def load_env_from_file():

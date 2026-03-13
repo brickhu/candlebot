@@ -1,0 +1,34 @@
+{
+  "name": "candlebot-webapp",
+  "version": "1.0.0",
+  "description": "Candlebot WebApp - AI-powered chart analysis platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "tailwind": "tailwindcss -i ./src/index.css -o ./src/output.css --watch"
+  },
+  "dependencies": {
+    "@solidjs/router": "^0.14.4",
+    "solid-js": "^1.8.19",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0-alpha.18",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.0.0-alpha.18",
+    "vite": "^5.4.8",
+    "vite-plugin-solid": "^2.10.3"
+  },
+  "keywords": [
+    "candlebot",
+    "trading",
+    "chart-analysis",
+    "ai",
+    "solidjs"
+  ],
+  "author": "Candlebot Team",
+  "license": "MIT"
+}

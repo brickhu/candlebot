@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/free/Projects/candlebot/backend && mv routers/backend-oauth-integration.py routers/oauth.py)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python -c \"\nimport sys\nsys.path.append\\('.'\\)\nfrom database import engine\nfrom models import Base\nprint\\('检查数据库表结构...'\\)\ntry:\n    Base.metadata.create_all\\(bind=engine\\)\n    print\\('✅ 数据库表结构已更新'\\)\nexcept Exception as e:\n    print\\(f'❌ 数据库更新失败: {e}'\\)\n\")",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python3 -c \"\nimport sys\nsys.path.append\\('.'\\)\nfrom database import engine\nfrom models import Base\nprint\\('检查数据库表结构...'\\)\ntry:\n    Base.metadata.create_all\\(bind=engine\\)\n    print\\('✅ 数据库表结构已更新'\\)\nexcept Exception as e:\n    print\\(f'❌ 数据库更新失败: {e}'\\)\n\")",
+      "Bash(python3 -m py_compile models.py && echo \"✅ models.py 语法正确\")"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 // 认证上下文
 import { createContext, createSignal, useContext, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
+import { mockLogin, mockGetUserInfo, mockRegister, shouldUseMockAPI } from '../utils/mockAuth'
 
 // API配置
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.candlebot.app'
@@ -45,68 +46,78 @@ export function AuthProvider(props) {
 
   // 从存储加载token
   createEffect(() => {
-    const loadAuthData = () => {
-      let storageTimeout = null
-      let isCompleted = false
-
-      const completeLoading = () => {
-        if (!isCompleted) {
-          isCompleted = true
-          setLoading(false)
-          if (storageTimeout) {
-            clearTimeout(storageTimeout)
-          }
-        }
-      }
-
+    const loadAuthData = async () => {
       try {
         // 检查chrome.storage是否可用
         if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
           console.warn('chrome.storage.local不可用，跳过认证检查')
-          completeLoading()
+          setLoading(false)
           return
         }
 
-        // 设置超时，防止chrome.storage回调永远不会执行
-        storageTimeout = setTimeout(() => {
-          console.warn('chrome.storage.get超时，强制完成loading')
-          completeLoading()
-        }, 5000) // 5秒超时
-
-        chrome.storage.local.get(['auth_token', 'user_info'], (result) => {
-          if (chrome.runtime.lastError) {
-            console.error('chrome.storage.local.get错误:', chrome.runtime.lastError)
-            completeLoading()
-            return
-          }
-
-          if (result.auth_token) {
-            setToken(result.auth_token)
-            if (result.user_info) {
-              setUser(result.user_info)
-              setIsAuthenticated(true)
-              completeLoading()
+        // 使用Promise包装chrome.storage API
+        const result = await new Promise((resolve, reject) => {
+          chrome.storage.local.get(['auth_token', 'user_info'], (result) => {
+            if (chrome.runtime.lastError) {
+              reject(chrome.runtime.lastError)
             } else {
-              // 如果有token但没有用户信息，尝试获取用户信息
-              // fetchUserInfo会在finally块中设置loading(false)
-              fetchUserInfo(result.auth_token)
+              resolve(result)
             }
-          } else {
-            completeLoading()
-          }
+          })
         })
+
+        if (result.auth_token) {
+          setToken(result.auth_token)
+          if (result.user_info) {
+            setUser(result.user_info)
+            setIsAuthenticated(true)
+            setLoading(false)
+          } else {
+            // 如果有token但没有用户信息，尝试获取用户信息
+            await fetchUserInfo(result.auth_token)
+          }
+        } else {
+          setLoading(false)
+        }
       } catch (error) {
         console.error('加载认证数据时出错:', error)
-        completeLoading()
+        setLoading(false)
       }
     }
 
-    // 添加延迟以确保扩展完全加载
-    setTimeout(loadAuthData, 100)
+    // 立即加载认证数据
+    loadAuthData()
   })
 
   // 获取用户信息
   const fetchUserInfo = async (authToken) => {
+    // 检查是否使用模拟API
+    if (shouldUseMockAPI()) {
+      try {
+        const userData = await mockGetUserInfo(authToken)
+        setUser(userData)
+        setIsAuthenticated(true)
+
+        // 保存到存储
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({
+            user_info: userData
+          })
+        }
+      } catch (error) {
+        console.error('获取模拟用户信息失败:', error)
+        setIsAuthenticated(false)
+        setToken(null)
+
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.remove(['auth_token', 'user_info'])
+        }
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10秒超时
 
@@ -194,6 +205,35 @@ export function AuthProvider(props) {
 
   // JSON格式登录
   const loginJson = async (email, password) => {
+    // 检查是否使用模拟API
+    if (shouldUseMockAPI()) {
+      try {
+        const result = await mockLogin(email, password)
+
+        if (result.success) {
+          const authToken = result.access_token
+
+          // 保存token
+          setToken(authToken)
+          if (chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({
+              auth_token: authToken
+            })
+          }
+
+          // 获取用户信息
+          await fetchUserInfo(authToken)
+
+          return { success: true }
+        } else {
+          return { success: false, error: result.error }
+        }
+      } catch (error) {
+        console.error('模拟登录错误:', error)
+        return { success: false, error: error.message }
+      }
+    }
+
     try {
       const response = await fetch(`${API_BASE}/auth/login-json`, {
         method: 'POST',
@@ -213,9 +253,11 @@ export function AuthProvider(props) {
 
       // 保存token
       setToken(authToken)
-      chrome.storage.local.set({
-        auth_token: authToken
-      })
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({
+          auth_token: authToken
+        })
+      }
 
       // 获取用户信息
       await fetchUserInfo(authToken)
@@ -229,6 +271,35 @@ export function AuthProvider(props) {
 
   // 注册
   const register = async (email, password, username) => {
+    // 检查是否使用模拟API
+    if (shouldUseMockAPI()) {
+      try {
+        const result = await mockRegister(email, password, username)
+
+        if (result.success) {
+          const authToken = result.access_token
+
+          // 保存token
+          setToken(authToken)
+          if (chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({
+              auth_token: authToken
+            })
+          }
+
+          // 获取用户信息
+          await fetchUserInfo(authToken)
+
+          return { success: true }
+        } else {
+          return { success: false, error: result.error }
+        }
+      } catch (error) {
+        console.error('模拟注册错误:', error)
+        return { success: false, error: error.message }
+      }
+    }
+
     try {
       const response = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
