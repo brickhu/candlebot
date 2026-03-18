@@ -36,12 +36,70 @@ const OAuthCallbackPage = () => {
       }
 
       // 保存token和用户信息
+      console.log('完整的OAuth响应:', response)
+
+      if (!response.data) {
+        throw new Error('OAuth响应中没有数据')
+      }
+
       const { access_token, user } = response.data
+      console.log('OAuth响应数据:', response.data)
+      console.log('用户信息:', user)
+
+      if (!access_token) {
+        throw new Error('OAuth响应中没有access_token')
+      }
+
       api.setToken(access_token)
 
-      // 更新auth上下文
-      if (auth && typeof auth.refreshUser === 'function') {
-        await auth.refreshUser()
+      // 直接设置用户信息到auth上下文
+      console.log('OAuthCallback中的auth对象:', auth)
+      console.log('auth类型:', typeof auth)
+      console.log('auth.refreshUser类型:', typeof auth?.refreshUser)
+      console.log('auth.user类型:', typeof auth?.user)
+
+      // 尝试多次获取auth上下文，因为可能异步加载
+      let retryCount = 0
+      const maxRetries = 5
+      const retryDelay = 200 // 毫秒
+
+      const tryRefreshUser = async () => {
+        if (auth && typeof auth.refreshUser === 'function') {
+          console.log('调用 auth.refreshUser()')
+          await auth.refreshUser()
+          console.log('auth.refreshUser() 完成')
+
+          // 检查用户是否已加载
+          console.log('当前用户:', auth.user ? auth.user() : '未设置')
+          return true
+        }
+        return false
+      }
+
+      let success = await tryRefreshUser()
+
+      while (!success && retryCount < maxRetries) {
+        console.log(`等待auth上下文初始化... 重试 ${retryCount + 1}/${maxRetries}`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
+        success = await tryRefreshUser()
+        retryCount++
+      }
+
+      if (!success) {
+        console.warn('auth上下文不可用或没有refreshUser方法')
+        console.log('完整的auth对象结构:', JSON.stringify(auth, null, 2))
+
+        // 即使没有auth上下文，也尝试直接加载用户
+        console.log('尝试直接调用api.getCurrentUser()')
+        try {
+          const userResponse = await api.getCurrentUser()
+          if (userResponse.success && userResponse.data) {
+            console.log('直接加载用户成功:', userResponse.data)
+            // 如果auth上下文后来可用，用户数据应该已经设置
+          }
+        } catch (error) {
+          console.error('直接加载用户失败:', error)
+        }
       }
 
       setStatus('success')

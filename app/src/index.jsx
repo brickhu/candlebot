@@ -8,6 +8,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import OAuthCallback from './pages/OAuthCallback';
+import UserTestPage from './pages/UserTest';
+import TestProxyPage from './pages/TestProxy';
 import NotFound from './pages/NotFound';
 
 const root = document.getElementById('root')
@@ -21,6 +23,8 @@ function App() {
         <Route path="/register" component={Register} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/oauth/callback" component={OAuthCallback} />
+        <Route path="/user-test" component={UserTestPage} />
+        <Route path="/test-proxy" component={TestProxyPage} />
         <Route path="*" component={NotFound} />
       </AuthProvider>
     </Router>

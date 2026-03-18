@@ -1,7 +1,7 @@
 """
 用户认证路由
 """
-from datetime import timedelta
+from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -21,43 +21,84 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """用户注册"""
-    # 检查邮箱是否已存在
-    existing_user = db.query(models.User).filter(
-        models.User.email == user_data.email
-    ).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邮箱已被注册"
-        )
-
-    # 创建新用户
-    hashed_password = auth.get_password_hash(user_data.password)
-    db_user = models.User(
-        email=user_data.email,
-        password_hash=hashed_password,
-        username=user_data.username or user_data.email.split("@")[0],
-        plan_type="free",
-        quota_total=5,
-        quota_used=0,
-        settings={}
-    )
+    print(f"注册请求: email={user_data.email}, username={user_data.username}")
 
     try:
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="注册失败，请重试"
+        # 检查邮箱是否已存在
+        existing_user = db.query(models.User).filter(
+            models.User.email == user_data.email
+        ).first()
+        if existing_user:
+            print(f"邮箱已存在: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="邮箱已被注册"
+            )
+
+        # 创建新用户
+        print("生成密码哈希...")
+        hashed_password = auth.get_password_hash(user_data.password)
+        print(f"密码哈希生成完成: {hashed_password[:20]}...")
+
+        quota_reset_date = datetime.utcnow() + timedelta(days=1)
+        print(f"设置配额重置日期: {quota_reset_date}")
+
+        db_user = models.User(
+            email=user_data.email,
+            password_hash=hashed_password,
+            username=user_data.username or user_data.email.split("@")[0],
+            plan_type="free",
+            quota_total=5,
+            quota_used=0,
+            quota_reset_date=quota_reset_date,
+            settings={},
+            # 显式设置OAuth字段为None
+            provider=None,
+            provider_id=None,
+            oauth_metadata=None
         )
 
-    return schemas.SuccessResponse(
-        message="注册成功",
-        data={"user_id": db_user.id}
-    )
+        print(f"创建用户对象: {db_user.email}")
+
+        try:
+            print("添加用户到数据库...")
+            db.add(db_user)
+            print("提交事务...")
+            db.commit()
+            print("刷新用户对象...")
+            db.refresh(db_user)
+            print(f"用户创建成功: ID={db_user.id}")
+        except IntegrityError as e:
+            db.rollback()
+            print(f"数据库完整性错误: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="注册失败，请重试"
+            )
+        except Exception as e:
+            db.rollback()
+            print(f"数据库错误: {type(e).__name__}: {e}")
+            import traceback
+            print(f"数据库错误详情:\n{traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"数据库错误: {str(e)}"
+            )
+
+        return schemas.SuccessResponse(
+            message="注册成功",
+            data={"user_id": db_user.id}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"注册过程中发生未知错误:\n{error_details}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="注册过程中发生未知错误"
+        )
 
 
 @router.post("/login", response_model=schemas.Token)

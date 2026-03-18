@@ -98,7 +98,11 @@ def check_user_quota(user: models.User) -> tuple[bool, int]:
     """
     # 检查配额重置日期
     today = datetime.utcnow().date()
-    if user.quota_reset_date and user.quota_reset_date.date() < today:
+
+    # 如果quota_reset_date为None，设置为明天
+    if user.quota_reset_date is None:
+        user.quota_reset_date = datetime.utcnow() + timedelta(days=1)
+    elif user.quota_reset_date.date() < today:
         # 重置配额
         user.quota_used = 0
         user.quota_reset_date = datetime.utcnow() + timedelta(days=1)

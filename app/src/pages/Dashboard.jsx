@@ -8,15 +8,62 @@ const DashboardPage = () => {
   const navigate = useNavigate()
   const [analyses, setAnalyses] = createSignal([])
   const [isLoading, setIsLoading] = createSignal(true)
+  const [authInitialized, setAuthInitialized] = createSignal(false)
 
   onMount(() => {
-    // Redirect if not authenticated
-    if (!auth.user()) {
-      navigate('/login')
-      return
+    console.log('=== Dashboard mounted ===')
+    console.log('1. auth对象:', auth)
+    console.log('2. auth类型:', typeof auth)
+    console.log('3. auth.user类型:', typeof auth?.user)
+    console.log('4. auth?.user:', auth?.user)
+    console.log('5. auth?.user():', auth?.user ? auth.user() : 'N/A')
+
+    // 检查localStorage中的token
+    const token = localStorage.getItem('auth_token')
+    console.log('6. localStorage auth_token:', token ? `存在 (${token.substring(0, 20)}...)` : '不存在')
+
+    // 等待auth上下文初始化
+    let retryCount = 0
+    const maxRetries = 30 // 最多等待3秒 (100ms * 30)
+
+    const checkAuth = () => {
+      retryCount++
+      console.log(`检查auth上下文 (尝试 ${retryCount}/${maxRetries}):`, auth)
+
+      if (auth === undefined) {
+        console.log('auth上下文尚未初始化，等待...')
+        if (retryCount < maxRetries) {
+          setTimeout(checkAuth, 100)
+        } else {
+          console.error('等待auth上下文超时！')
+          setAuthInitialized(true) // 即使超时也设置为true，显示错误状态
+        }
+        return
+      }
+
+      setAuthInitialized(true)
+      console.log('✅ auth上下文已初始化:', auth)
+      console.log('auth对象结构:', Object.keys(auth || {}))
+
+      // 检查auth对象的方法
+      console.log('auth.refreshUser类型:', typeof auth?.refreshUser)
+      console.log('auth.login类型:', typeof auth?.login)
+      console.log('auth.logout类型:', typeof auth?.logout)
+
+      // Redirect if not authenticated
+      if (!auth || !auth.user()) {
+        console.log('❌ 用户未认证，重定向到登录页')
+        console.log('auth.user():', auth?.user ? auth.user() : 'auth.user不存在')
+        navigate('/login')
+        return
+      }
+
+      console.log('✅ 用户已认证，加载分析数据')
+      console.log('用户信息:', auth.user())
+      loadAnalyses()
     }
 
-    loadAnalyses()
+    checkAuth()
   })
 
   const loadAnalyses = async () => {
@@ -70,22 +117,29 @@ const DashboardPage = () => {
 
   return (
     <div class="animate-fade-in">
-      <Show when={!auth.user()}>
+      <Show when={!authInitialized()}>
+        <div class="text-center py-20">
+          <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p class="text-muted">Initializing authentication...</p>
+        </div>
+      </Show>
+
+      <Show when={authInitialized() && (!auth || !auth.user())}>
         <div class="text-center py-20">
           <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p class="text-muted">Loading dashboard...</p>
         </div>
       </Show>
 
-      <Show when={auth.user()}>
+      <Show when={authInitialized() && auth && auth.user()}>
         {/* Dashboard Header */}
         <div class="border-b border-border">
           <div class="max-w-6xl mx-auto px-6 py-8">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
-                <h1 class="text-3xl font-bold mb-2">Welcome back, {auth.user()?.username}!</h1>
+                <h1 class="text-3xl font-bold mb-2">Welcome back, {auth?.user()?.username}!</h1>
                 <p class="text-muted">
-                  You have {auth.user()?.quota_total - (auth.user()?.quota_used || 0)} free analyses remaining today
+                  You have {auth?.user()?.quota_total - (auth?.user()?.quota_used || 0)} free analyses remaining today
                 </p>
               </div>
               <button
@@ -106,8 +160,8 @@ const DashboardPage = () => {
                 },
                 {
                   label: 'Today Used',
-                  value: auth.user()?.quota_used?.toString() || '0',
-                  change: `${auth.user()?.quota_used || 0}/${auth.user()?.quota_total || 0}`,
+                  value: auth?.user()?.quota_used?.toString() || '0',
+                  change: `${auth?.user()?.quota_used || 0}/${auth?.user()?.quota_total || 0}`,
                 },
                 {
                   label: 'Avg. Rating',

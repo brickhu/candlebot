@@ -15,14 +15,14 @@ const Layout = (props) => {
     <div class="min-h-screen bg-bg text-text">
       <Navbar />
       <main class="pt-16">
-        {/* <Show when={auth.isLoading()}>
+        <Show when={auth.isLoading()}>
           <div class="fixed inset-0 bg-bg/80 backdrop-blur-sm z-50 flex items-center justify-center">
             <div class="text-center">
               <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p class="text-muted font-mono text-sm">Loading...</p>
             </div>
           </div>
-        </Show> */}
+        </Show>
         {props.children}
       </main>
       <footer class="border-t border-border py-8 mt-16">

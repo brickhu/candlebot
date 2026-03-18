@@ -215,6 +215,48 @@ async def health():
     }
 
 
+@app.get("/debug/db-test")
+async def debug_db_test(db: Session = Depends(get_db)):
+    """调试端点：测试数据库连接和表结构"""
+    try:
+        # 测试查询
+        user_count = db.query(models.User).count()
+
+        # 测试表结构
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        tables = inspector.get_table_names()
+
+        # 检查users表结构
+        users_columns = []
+        if 'users' in tables:
+            users_columns = inspector.get_columns('users')
+
+        return {
+            "status": "ok",
+            "user_count": user_count,
+            "tables": tables,
+            "users_columns": [
+                {
+                    "name": col['name'],
+                    "type": str(col['type']),
+                    "nullable": col.get('nullable', True),
+                    "default": col.get('default')
+                }
+                for col in users_columns
+            ]
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"数据库调试错误:\n{error_details}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
+
 @app.post("/analyze", response_model=schemas.AnalyzeResponse)
 async def analyze(
     req: schemas.AnalyzeRequest,

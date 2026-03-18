@@ -7,6 +7,7 @@ const HomePage = () => {
 
   const handleGetStarted = () => {
     if (auth.user()) {
+      
       navigate('/dashboard')
     } else {
       navigate('/register')

@@ -17,8 +17,15 @@ CREATE TABLE users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP WITH TIME ZONE,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    -- OAuth相关字段
+    provider VARCHAR(50),           -- google, github等
+    provider_id VARCHAR(255),       -- 第三方平台用户ID
+    oauth_metadata JSONB            -- 原始OAuth数据
 );
+
+-- 为provider_id创建索引
+CREATE INDEX idx_users_provider_id ON users(provider_id);
 
 -- 分析记录表
 CREATE TABLE analysis_records (

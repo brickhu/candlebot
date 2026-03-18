@@ -27,9 +27,9 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     # OAuth相关字段
-    provider = Column(String(50), nullable=True)  # google, github等
-    provider_id = Column(String(255), nullable=True, index=True)  # 第三方平台用户ID
-    oauth_metadata = Column(JSON, nullable=True)  # 原始OAuth数据
+    provider = Column(String(50), nullable=True, default=None)  # google, github等
+    provider_id = Column(String(255), nullable=True, default=None, index=True)  # 第三方平台用户ID
+    oauth_metadata = Column(JSON, nullable=True, default=None)  # 原始OAuth数据
 
     # 关系
     analyses = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")

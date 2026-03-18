@@ -13,6 +13,15 @@ export default defineConfig(({ mode }) => {
       host: true,
       // 允许通过自定义域名访问
       allowedHosts: ['local.yourdomain.com'],
+      // 代理配置，解决开发环境CORS问题
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URL || 'https://candelbot-backend-dev.up.railway.app',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+          secure: false, // 如果后端使用自签名证书，需要设置为false
+        },
+      },
     },
     // 环境变量前缀
     envPrefix: 'VITE_',
