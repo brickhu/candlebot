@@ -19,7 +19,12 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7天
 
 # 密码哈希上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 使用pbkdf2_sha256，简单可靠，没有bcrypt的72字节限制
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto",
+    pbkdf2_sha256__default_rounds=30000  # 默认轮数
+)
 
 # OAuth2方案
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -27,11 +32,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
+    # 使用pbkdf2_sha256，没有bcrypt的72字节限制
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """生成密码哈希"""
+    # 使用pbkdf2_sha256，没有bcrypt的72字节限制
     return pwd_context.hash(password)
 
 

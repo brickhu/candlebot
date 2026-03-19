@@ -257,6 +257,60 @@ async def debug_db_test(db: Session = Depends(get_db)):
         }
 
 
+@app.post("/debug/test-register")
+async def debug_test_register(
+    email: str = "debug@example.com",
+    password: str = "debug123",
+    db: Session = Depends(get_db)
+):
+    """调试端点：简单测试用户注册"""
+    try:
+        print(f"调试注册: email={email}")
+
+        # 检查邮箱是否已存在
+        existing_user = db.query(models.User).filter(
+            models.User.email == email
+        ).first()
+        if existing_user:
+            return {"status": "error", "message": "邮箱已存在"}
+
+        # 简单创建用户，不使用auth模块
+        from datetime import datetime, timedelta
+        db_user = models.User(
+            email=email,
+            password_hash="debug_hash",  # 简单哈希
+            username=email.split("@")[0],
+            plan_type="free",
+            quota_total=5,
+            quota_used=0,
+            quota_reset_date=datetime.utcnow() + timedelta(days=1),
+            settings={},
+            provider=None,
+            provider_id=None,
+            oauth_metadata=None
+        )
+
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+        return {
+            "status": "success",
+            "message": "用户创建成功",
+            "user_id": db_user.id
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"调试注册错误:\n{error_details}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": error_details
+        }
+
+
 @app.post("/analyze", response_model=schemas.AnalyzeResponse)
 async def analyze(
     req: schemas.AnalyzeRequest,
