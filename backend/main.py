@@ -407,15 +407,45 @@ async def analyze(
 
             # OpenAI 兼容格式解析
             raw = resp.json()["choices"][0]["message"]["content"]
+            print(f"🤖 AI原始响应 (前500字符): {raw[:500]}...")
+            print(f"🤖 AI原始响应长度: {len(raw)} 字符")
 
         # 解析元数据
         meta = {}
         for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
             m = re.search(rf"{key}:(.+?)(?:\n|$)", raw)
-            meta[key.lower()] = m.group(1).strip() if m else ""
+            value = m.group(1).strip() if m else ""
+
+            # 特殊处理rating_score，需要转换为整数
+            if key == "RATING_SCORE":
+                try:
+                    meta[key.lower()] = int(value) if value else 0
+                except ValueError:
+                    print(f"⚠️ rating_score转换失败: '{value}'，使用默认值0")
+                    meta[key.lower()] = 0
+            # 确保price是字符串
+            elif key == "PRICE":
+                meta[key.lower()] = str(value) if value else "0"
+            else:
+                meta[key.lower()] = value
 
         # 清理报告内容
         clean = re.sub(r"\n*---\s*\nMETADATA.*$", "", raw, flags=re.DOTALL).strip()
+
+        print(f"📊 解析的元数据: {meta}")
+        print(f"📊 原始报告内容长度: {len(raw)} 字符")
+        print(f"📊 清理后报告内容长度: {len(clean)} 字符")
+
+        # 创建AnalysisMetadata实例
+        try:
+            analysis_metadata = schemas.AnalysisMetadata(**meta)
+            print(f"✅ 成功创建AnalysisMetadata: {analysis_metadata}")
+        except Exception as e:
+            print(f"❌ 创建AnalysisMetadata失败: {e}")
+            print(f"❌ meta字典内容: {meta}")
+            # 创建默认的AnalysisMetadata
+            analysis_metadata = schemas.AnalysisMetadata()
+            print(f"✅ 使用默认AnalysisMetadata: {analysis_metadata}")
 
         # 计算图片哈希
         image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
@@ -445,7 +475,7 @@ async def analyze(
 
         return schemas.AnalyzeResponse(
             report=clean,
-            meta=schemas.AnalysisMetadata(**meta),
+            analysis_metadata=analysis_metadata,
             remaining_today=new_remaining,
             platform=platform,
             record_id=db_record.id

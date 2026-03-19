@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot 扩展模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #1f2937;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h2::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #4f46e5;
+            border-radius: 50%;
+        }
+
+        .method-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .method-card:hover {
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.1);
+        }
+
+        .method-card.active {
+            border-color: #4f46e5;
+            background: #eef2ff;
+        }
+
+        .method-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .method-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 16px;
+        }
+
+        .method-badge {
+            background: #4f46e5;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .method-desc {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .image-preview {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+        }
+
+        .image-preview.drag-over {
+            border-color: #4f46e5;
+            background: #eef2ff;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .upload-btn {
+            display: inline-block;
+            background: #4f46e5;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 16px;
+        }
+
+        .upload-btn:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0);
+        }
+
+        .test-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 18px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .test-btn:active {
+            transform: translateY(0);
+        }
+
+        .test-btn.secondary {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            margin-top: 15px;
+        }
+
+        .test-btn.secondary:hover {
+            box-shadow: 0 10px 25px rgba(107, 114, 128, 0.3);
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+            display: block;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            display: block;
+        }
+
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            display: block;
+        }
+
+        .code-block {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .code-block.active {
+            display: block;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+            font-size: 14px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer a {
+            color: #4f46e5;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .method-details {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 Candlebot 扩展模拟器</h1>
+            <p>测试浏览器扩展与Web应用的集成功能</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>选择测试方法</h2>
+
+                <div class="method-card" onclick="selectMethod('url')" id="method-url">
+                    <div class="method-header">
+                        <div class="method-title">URL参数传递</div>
+                        <div class="method-badge">简单</div>
+                    </div>
+                    <div class="method-desc">
+                        通过URL查询参数传递图片数据，适合小尺寸图片。
+                    </div>
+                    <div class="method-details">
+                        数据长度限制：约2000字符（受URL长度限制）
+                    </div>
+                </div>
+
+                <div class="method-card" onclick="selectMethod('storage')" id="method-storage">
+                    <div class="method-header">
+                        <div class="method-title">localStorage传递</div>
+                        <div class="method-badge">推荐</div>
+                    </div>
+                    <div class="method-desc">
+                        使用localStorage存储图片数据，适合大尺寸图片。
+                    </div>
+                    <div class="method-details">
+                        数据长度限制：约5MB（受localStorage限制）
+                    </div>
+                </div>
+
+                <div class="method-card" onclick="selectMethod('message')" id="method-message">
+                    <div class="method-header">
+                        <div class="method-title">postMessage API</div>
+                        <div class="method-badge">高级</div>
+                    </div>
+                    <div class="method-desc">
+                        使用postMessage进行跨窗口通信，实时传递数据。
+                    </div>
+                    <div class="method-details">
+                        实时通信，无数据大小限制（受内存限制）
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>上传测试图片</h2>
+                <div class="image-preview" id="imagePreview">
+                    <div id="previewPlaceholder">
+                        <div style="font-size: 48px; margin-bottom: 15px;">📸</div>
+                        <p style="color: #6b7280; margin-bottom: 15px;">拖放图片到这里，或点击选择文件</p>
+                        <p style="color: #9ca3af; font-size: 14px; margin-bottom: 20px;">支持PNG、JPG格式，建议使用K线图表截图</p>
+                        <label class="upload-btn">
+                            选择图片
+                            <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
+                        </label>
+                    </div>
+                    <img id="previewImage" style="display: none;">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>执行测试</h2>
+                <button class="test-btn" onclick="runTest()" id="testBtn">
+                    🚀 测试扩展跳转
+                </button>
+                <button class="test-btn secondary" onclick="resetTest()">
+                    🔄 重置测试
+                </button>
+
+                <div class="status" id="status"></div>
+
+                <div class="code-block" id="codeBlock"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>前端开发服务器：<a href="http://localhost:5174" target="_blank">http://localhost:5174</a></p>
+            <p>确保已登录Candlebot账户，否则会自动跳转到登录页面</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedMethod = 'storage'
+        let selectedImage = null
+        let imageBase64 = null
+
+        function selectMethod(method) {
+            selectedMethod = method
+
+            // 更新UI
+            document.querySelectorAll('.method-card').forEach(card => {
+                card.classList.remove('active')
+            })
+            document.getElementById(`method-${method}`).classList.add('active')
+
+            updateStatus('info', `已选择测试方法：${getMethodName(method)}`)
+        }
+
+        function getMethodName(method) {
+            const names = {
+                'url': 'URL参数传递',
+                'storage': 'localStorage传递',
+                'message': 'postMessage API'
+            }
+            return names[method] || method
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0]
+            if (!file) return
+
+            // 检查文件类型
+            if (!file.type.startsWith('image/')) {
+                updateStatus('error', '请选择图片文件（PNG、JPG、JPEG）')
+                return
+            }
+
+            // 检查文件大小（限制5MB）
+            if (file.size > 5 * 1024 * 1024) {
+                updateStatus('error', '图片大小不能超过5MB')
+                return
+            }
+
+            selectedImage = file
+
+            // 显示预览
+            const reader = new FileReader()
+            reader.onload = function(e) {
+                imageBase64 = e.target.result.split(',')[1]
+
+                const preview = document.getElementById('imagePreview')
+                const placeholder = document.getElementById('previewPlaceholder')
+                const image = document.getElementById('previewImage')
+
+                placeholder.style.display = 'none'
+                image.src = `data:image/png;base64,${imageBase64}`
+                image.style.display = 'block'
+
+                preview.classList.add('drag-over')
+                setTimeout(() => preview.classList.remove('drag-over'), 500)
+
+                updateStatus('success', `已选择图片：${file.name} (${(file.size / 1024).toFixed(1)}KB)`)
+            }
+            reader.readAsDataURL(file)
+        }
+
+        function runTest() {
+            if (!selectedImage) {
+                updateStatus('error', '请先选择测试图片')
+                return
+            }
+
+            if (!imageBase64) {
+                updateStatus('error', '图片数据加载失败，请重试')
+                return
+            }
+
+            const testBtn = document.getElementById('testBtn')
+            testBtn.disabled = true
+            testBtn.innerHTML = '⏳ 处理中...'
+
+            try {
+                switch (selectedMethod) {
+                    case 'url':
+                        testUrlMethod()
+                        break
+                    case 'storage':
+                        testStorageMethod()
+                        break
+                    case 'message':
+                        testMessageMethod()
+                        break
+                }
+            } catch (error) {
+                updateStatus('error', `测试失败：${error.message}`)
+                testBtn.disabled = false
+                testBtn.innerHTML = '🚀 测试扩展跳转'
+            }
+        }
+
+        function testUrlMethod() {
+            // URL方法有长度限制
+            if (imageBase64.length > 2000) {
+                updateStatus('error', '图片数据太大，URL方法只适合小图片。请使用localStorage方法。')
+                document.getElementById('testBtn').disabled = false
+                document.getElementById('testBtn').innerHTML = '🚀 测试扩展跳转'
+                return
+            }
+
+            const encodedImage = encodeURIComponent(imageBase64)
+            const url = `http://localhost:5174/dashboard?from_extension=true&image_data=${encodedImage}`
+
+            showCodeExample('url', url)
+            updateStatus('info', '正在打开新窗口...')
+
+            setTimeout(() => {
+                window.open(url, '_blank')
+                updateStatus('success', '✅ 已打开新窗口，检查是否自动填充图片')
+                document.getElementById('testBtn').disabled = false
+                document.getElementById('testBtn').innerHTML = '🚀 测试扩展跳转'
+            }, 500)
+        }
+
+        function testStorageMethod() {
+            // 存储到localStorage
+            localStorage.setItem('candlebot_extension_image', imageBase64)
+
+            const url = 'http://localhost:5174/dashboard?from_extension=true'
+
+            showCodeExample('storage', url)
+            updateStatus('info', '数据已存储到localStorage，正在打开新窗口...')
+
+            setTimeout(() => {
+                window.open(url, '_blank')
+                updateStatus('success', '✅ 已打开新窗口，检查是否自动填充图片')
+                document.getElementById('testBtn').disabled = false
+                document.getElementById('testBtn').innerHTML = '🚀 测试扩展跳转'
+            }, 500)
+        }
+
+        function testMessageMethod() {
+            const url = 'http://localhost:5174/dashboard'
+            const webWindow = window.open(url, '_blank')
+
+            showCodeExample('message', url)
+            updateStatus('info', '已打开新窗口，等待页面加载后发送数据...')
+
+            // 等待页面加载
+            setTimeout(() => {
+                try {
+                    webWindow.postMessage({
+                        type: 'candlebot_extension_image',
+                        imageData: imageBase64
+                    }, 'http://localhost:5174')
+
+                    updateStatus('success', '✅ 已发送postMessage消息，检查是否自动填充图片')
+                } catch (error) {
+                    updateStatus('error', `发送消息失败：${error.message}`)
+                }
+
+                document.getElementById('testBtn').disabled = false
+                document.getElementById('testBtn').innerHTML = '🚀 测试扩展跳转'
+            }, 2000)
+        }
+
+        function showCodeExample(method, url) {
+            const codeBlock = document.getElementById('codeBlock')
+            let code = ''
+
+            switch (method) {
+                case 'url':
+                    code = `// 扩展中的跳转代码
+const imageBase64 = '${imageBase64.substring(0, 50)}...'; // 截图数据
+const redirectUrl = '${url}';
+
+// 打开新窗口
+window.open(redirectUrl, '_blank');`
+                    break
+
+                case 'storage':
+                    code = `// 扩展中的跳转代码
+const imageBase64 = '${imageBase64.substring(0, 50)}...'; // 截图数据
+
+// 存储到localStorage
+localStorage.setItem('candlebot_extension_image', imageBase64);
+
+// 打开新窗口
+window.open('${url}', '_blank');`
+                    break
+
+                case 'message':
+                    code = `// 扩展中的跳转代码
+const imageBase64 = '${imageBase64.substring(0, 50)}...'; // 截图数据
+
+// 打开新窗口
+const webWindow = window.open('${url}', '_blank');
+
+// 等待页面加载后发送数据
+setTimeout(() => {
+    webWindow.postMessage({
+        type: 'candlebot_extension_image',
+        imageData: imageBase64
+    }, 'http://localhost:5174');
+}, 1000);`
+                    break
+            }
+
+            codeBlock.textContent = code
+            codeBlock.classList.add('active')
+        }
+
+        function resetTest() {
+            selectedImage = null
+            imageBase64 = null
+
+            // 重置预览
+            document.getElementById('previewPlaceholder').style.display = 'block'
+            document.getElementById('previewImage').style.display = 'none'
+            document.getElementById('imageInput').value = ''
+
+            // 清理localStorage
+            localStorage.removeItem('candlebot_extension_image')
+
+            // 重置状态
+            updateStatus('info', '测试已重置，请重新选择图片和方法')
+            document.getElementById('codeBlock').classList.remove('active')
+            document.getElementById('testBtn').disabled = false
+            document.getElementById('testBtn').innerHTML = '🚀 测试扩展跳转'
+        }
+
+        function updateStatus(type, message) {
+            const status = document.getElementById('status')
+            status.className = `status ${type}`
+            status.textContent = message
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            selectMethod('storage')
+            updateStatus('info', '请选择测试方法和上传图片')
+
+            // 设置拖放功能
+            const preview = document.getElementById('imagePreview')
+            preview.addEventListener('dragover', (e) => {
+                e.preventDefault()
+                preview.classList.add('drag-over')
+            })
+
+            preview.addEventListener('dragleave', () => {
+                preview.classList.remove('drag-over')
+            })
+
+            preview.addEventListener('drop', (e) => {
+                e.preventDefault()
+                preview.classList.remove('drag-over')
+
+                const file = e.dataTransfer.files[0]
+                if (file) {
+                    const inputEvent = { target: { files: [file] } }
+                    handleImageSelect(inputEvent)
+                }
+            })
+        })
+    </script>
+</body>
+</html>

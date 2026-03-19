@@ -88,6 +88,19 @@ class PaymentRecord(Base):
     user = relationship("User", back_populates="payments")
 
 
+class VerificationCode(Base):
+    __tablename__ = "verification_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    code = Column(String(6), nullable=False)  # 6位数字验证码
+    code_type = Column(String(50), nullable=False, default="register")  # register, reset_password, change_email
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    attempts = Column(Integer, default=0)  # 验证尝试次数
+
+
 class APILog(Base):
     __tablename__ = "api_logs"
 

@@ -143,11 +143,28 @@ class ApiClient {
 
   // Analysis endpoints
   async getAnalyses(page = 1, limit = 20) {
-    return this.request(`/analysis?page=${page}&limit=${limit}`)
+    // 使用 /analysis/history 端点，它支持分页
+    return this.request(`/analysis/history?page=${page}&per_page=${limit}`)
   }
 
   async getAnalysis(id) {
     return this.request(`/analysis/${id}`)
+  }
+
+  async analyzeImage(imageBase64, platform = "tradingview", lang = "zh") {
+    console.log('📸 提交图片分析请求')
+    console.log('平台:', platform)
+    console.log('语言:', lang)
+    console.log('图片大小:', imageBase64.length, '字符')
+
+    return this.request('/analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        platform: platform,
+        lang: lang
+      }),
+    })
   }
 
   // Utility methods

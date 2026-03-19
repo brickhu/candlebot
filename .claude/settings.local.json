@@ -52,7 +52,9 @@
       "Bash(find /Users/free/Projects/candlebot -name \"*.pyc\" -o -name \"__pycache__\" -o -name \".pytest_cache\" -o -name \".coverage\" 2>/dev/null | head -10)",
       "Bash(find /Users/free/Projects/candlebot -name \"__pycache__\" -type d -exec rm -rf {} + 2>/dev/null && find /Users/free/Projects/candlebot -name \"*.pyc\" -delete 2>/dev/null)",
       "Bash(find /Users/free/Projects/candlebot -type f -name \"*.log\" -o -name \"*.tmp\" -o -name \"temp*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
-      "Bash(find /Users/free/Projects/candlebot -type d -name \"venv*\" -o -name \".venv*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")"
+      "Bash(find /Users/free/Projects/candlebot -type d -name \"venv*\" -o -name \".venv*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
+      "Bash(npm run:*)",
+      "Bash(node -c /Users/free/Projects/candlebot/app/src/pages/Dashboard.jsx 2>&1)"
     ]
   }
 }
