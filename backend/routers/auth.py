@@ -176,21 +176,33 @@ async def get_current_user_info(
     try:
         print(f"🔍 获取用户信息: user_id={current_user.id}, email={current_user.email}")
 
+        # 确保配额已重置（如果需要）
+        from auth import reset_user_quota_if_needed, check_user_quota
+        reset_user_quota_if_needed(db, current_user)
+
         # 计算剩余配额
-        from auth import check_user_quota
         _, remaining = check_user_quota(current_user)
         print(f"📊 用户剩余配额: {remaining}")
 
         # 刷新用户对象以确保获取最新数据
         db.refresh(current_user)
 
-        # 转换为响应模型
-        print("🔄 转换为UserInDB模型...")
-        user_data = schemas.UserInDB.from_orm(current_user)
-        print(f"✅ 转换成功: id={user_data.id}, email={user_data.email}")
-
-        user_data.quota_remaining = remaining
-        print(f"📋 最终用户数据: {user_data.dict()}")
+        # 手动创建UserInDB实例，因为quota_remaining是计算字段
+        print("🔄 创建UserInDB实例...")
+        user_data = schemas.UserInDB(
+            id=current_user.id,
+            email=current_user.email,
+            username=current_user.username,
+            plan_type=current_user.plan_type,
+            quota_total=current_user.quota_total,
+            quota_used=current_user.quota_used,
+            quota_remaining=remaining,  # 计算字段
+            settings=current_user.settings or {},
+            created_at=current_user.created_at,
+            last_login_at=current_user.last_login_at,
+            is_active=current_user.is_active
+        )
+        print(f"✅ 创建成功: id={user_data.id}, email={user_data.email}")
 
         return user_data
     except Exception as e:

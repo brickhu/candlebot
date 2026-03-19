@@ -108,20 +108,28 @@ async def get_current_active_user(
 def check_user_quota(user: models.User) -> tuple[bool, int]:
     """检查用户配额
     返回：(是否允许, 剩余次数)
+
+    注意：这个函数只计算剩余配额，不修改用户对象。
+    修改用户对象的逻辑应该在调用者处处理。
     """
-    # 检查配额重置日期
+    # 计算剩余配额
+    remaining = user.quota_total - user.quota_used
+    return remaining > 0, remaining
+
+
+def reset_user_quota_if_needed(db: Session, user: models.User) -> None:
+    """如果需要，重置用户配额"""
     today = datetime.utcnow().date()
 
     # 如果quota_reset_date为None，设置为明天
     if user.quota_reset_date is None:
         user.quota_reset_date = datetime.utcnow() + timedelta(days=1)
+        db.commit()
     elif user.quota_reset_date.date() < today:
         # 重置配额
         user.quota_used = 0
         user.quota_reset_date = datetime.utcnow() + timedelta(days=1)
-
-    remaining = user.quota_total - user.quota_used
-    return remaining > 0, remaining
+        db.commit()
 
 
 def increment_user_quota(db: Session, user: models.User) -> int:
@@ -129,7 +137,7 @@ def increment_user_quota(db: Session, user: models.User) -> int:
     返回：使用后的剩余次数
     """
     # 确保配额已重置
-    check_user_quota(user)
+    reset_user_quota_if_needed(db, user)
 
     user.quota_used += 1
     db.commit()

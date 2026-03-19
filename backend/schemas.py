@@ -32,7 +32,7 @@ class UserInDB(UserBase):
     plan_type: str
     quota_total: int
     quota_used: int
-    quota_remaining: int
+    quota_remaining: Optional[int] = None  # 计算字段，可选
     settings: Dict[str, Any]
     created_at: datetime
     last_login_at: Optional[datetime]
