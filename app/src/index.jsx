@@ -16,8 +16,8 @@ const root = document.getElementById('root')
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
@@ -26,8 +26,8 @@ function App() {
         <Route path="/user-test" component={UserTestPage} />
         <Route path="/test-proxy" component={TestProxyPage} />
         <Route path="*" component={NotFound} />
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   )
 }
 

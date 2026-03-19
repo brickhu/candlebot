@@ -72,6 +72,9 @@ class ApiClient {
 
       if (!response.ok) {
         console.error(`❌ 请求失败: ${response.status} ${response.statusText}`)
+        console.error(`❌ 错误响应数据:`, data)
+        console.error(`❌ 错误详情:`, data.detail)
+        console.error(`❌ 完整响应:`, response)
         return {
           success: false,
           error: {
@@ -103,13 +106,17 @@ class ApiClient {
 
   // Auth endpoints
   async login(credentials) {
-    return this.request('/auth/login', {
+    console.log('🔐 登录请求数据:', credentials)
+    // 使用 /login-json 端点，它接受 email 和 password 字段
+    return this.request('/auth/login-json', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
   }
 
   async register(data) {
+    console.log('📝 注册请求数据:', data)
+    console.log('📝 注册请求JSON:', JSON.stringify(data))
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),

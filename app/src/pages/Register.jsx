@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 
 const RegisterPage = () => {
+  console.log('🔧 RegisterPage组件开始渲染')
   const [email, setEmail] = createSignal('')
   const [username, setUsername] = createSignal('')
   const [password, setPassword] = createSignal('')
@@ -12,6 +13,10 @@ const RegisterPage = () => {
   const [isLoading, setIsLoading] = createSignal(false)
 
   const auth = useAuth()
+  console.log('🔧 Register页面中的auth对象:', auth)
+  console.log('🔧 auth的类型:', typeof auth)
+  console.log('🔧 auth.register:', auth?.register)
+  console.log('🔧 auth.register的类型:', typeof auth?.register)
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -26,6 +31,13 @@ const RegisterPage = () => {
 
     if (password().length < 8) {
       setError('Password must be at least 8 characters')
+      return
+    }
+
+    // Email validation
+    const emailValue = email()
+    if (!emailValue || !emailValue.includes('@')) {
+      setError('Please enter a valid email address')
       return
     }
 

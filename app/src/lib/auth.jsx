@@ -50,12 +50,20 @@ export const AuthProvider = (props) => {
   const login = async (email, password) => {
     setIsLoading(true)
     try {
-      const response = await api.login({ email, password })
-      if (response.success && response.data) {
-        api.setToken(response.data.access_token)
-        setUser(response.data.user)
-        return true
+      // 1. 登录获取token
+      const loginResponse = await api.login({ email, password })
+      if (loginResponse.success && loginResponse.data) {
+        api.setToken(loginResponse.data.access_token)
+
+        // 2. 获取用户信息
+        const userResponse = await api.getCurrentUser()
+        if (userResponse.success && userResponse.data) {
+          setUser(userResponse.data)
+          return true
+        }
       }
+
+      console.error('Login failed:', loginResponse.error)
       return false
     } catch (error) {
       console.error('Login failed:', error)
@@ -68,12 +76,41 @@ export const AuthProvider = (props) => {
   const register = async (email, username, password) => {
     setIsLoading(true)
     try {
-      const response = await api.register({ email, username, password })
-      if (response.success && response.data) {
-        api.setToken(response.data.access_token)
-        setUser(response.data.user)
-        return true
+      // 1. 准备注册数据 - 总是包含username字段，即使为空
+      const registerData = {
+        email: email.trim(),
+        password: password,
+        username: username ? username.trim() : null, // 显式发送null
       }
+
+      console.log('📝 发送注册数据:', registerData)
+      console.log('📝 注册数据JSON:', JSON.stringify(registerData))
+
+      // 2. 先注册
+      const registerResponse = await api.register(registerData)
+      if (!registerResponse.success) {
+        console.error('Registration failed:', registerResponse.error)
+        return false
+      }
+
+      // 3. 注册成功后自动登录
+      const loginResponse = await api.login({ email: email.trim(), password })
+      if (loginResponse.success && loginResponse.data) {
+        api.setToken(loginResponse.data.access_token)
+
+        // 4. 获取用户信息
+        const userResponse = await api.getCurrentUser()
+        if (userResponse.success && userResponse.data) {
+          setUser(userResponse.data)
+          return true
+        }
+      }
+
+      console.error('Auto-login after registration failed:')
+      console.error('登录响应:', loginResponse)
+      console.error('错误详情:', loginResponse.error)
+      console.error('错误消息:', loginResponse.error?.message)
+      console.error('错误代码:', loginResponse.error?.code)
       return false
     } catch (error) {
       console.error('Registration failed:', error)
@@ -109,6 +146,9 @@ export const AuthProvider = (props) => {
     refreshUser,
   }
 
+  console.log('AuthProvider渲染，value包含:', Object.keys(value))
+  console.log('register函数:', typeof value.register)
+
   return (
     <AuthContext.Provider value={value}>
       {props.children}
@@ -116,4 +156,32 @@ export const AuthProvider = (props) => {
   )
 }
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) {
+    console.error('❌ useAuth must be used within an AuthProvider')
+    console.trace('useAuth called outside AuthProvider')
+    // 返回一个安全的默认对象，但标记为无效
+    return {
+      _isValid: false,
+      user: () => null,
+      isLoading: () => false,
+      login: () => {
+        console.error('login called but auth not available - component outside AuthProvider')
+        return Promise.resolve(false)
+      },
+      register: () => {
+        console.error('register called but auth not available - component outside AuthProvider')
+        return Promise.resolve(false)
+      },
+      logout: () => {
+        console.error('logout called but auth not available - component outside AuthProvider')
+      },
+      refreshUser: () => {
+        console.error('refreshUser called but auth not available - component outside AuthProvider')
+      },
+    }
+  }
+  console.log('✅ useAuth返回有效的AuthContext')
+  return context
+}

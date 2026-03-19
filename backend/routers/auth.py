@@ -169,17 +169,38 @@ async def login_json(
 
 @router.get("/me", response_model=schemas.UserInDB)
 async def get_current_user_info(
-    current_user: models.User = Depends(auth.get_current_active_user)
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """获取当前用户信息"""
-    # 计算剩余配额
-    from auth import check_user_quota
-    _, remaining = check_user_quota(current_user)
+    try:
+        print(f"🔍 获取用户信息: user_id={current_user.id}, email={current_user.email}")
 
-    # 转换为响应模型
-    user_data = schemas.UserInDB.from_orm(current_user)
-    user_data.quota_remaining = remaining
-    return user_data
+        # 计算剩余配额
+        from auth import check_user_quota
+        _, remaining = check_user_quota(current_user)
+        print(f"📊 用户剩余配额: {remaining}")
+
+        # 刷新用户对象以确保获取最新数据
+        db.refresh(current_user)
+
+        # 转换为响应模型
+        print("🔄 转换为UserInDB模型...")
+        user_data = schemas.UserInDB.from_orm(current_user)
+        print(f"✅ 转换成功: id={user_data.id}, email={user_data.email}")
+
+        user_data.quota_remaining = remaining
+        print(f"📋 最终用户数据: {user_data.dict()}")
+
+        return user_data
+    except Exception as e:
+        print(f"❌ /auth/me 端点错误: {type(e).__name__}: {e}")
+        import traceback
+        print(f"❌ 错误详情:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.put("/me", response_model=schemas.UserInDB)
