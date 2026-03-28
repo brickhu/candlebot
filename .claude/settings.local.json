@@ -69,7 +69,16 @@
       "Bash(cd /Users/free/Projects/candlebot/extension && node test-screenshot-fix.js)",
       "Bash(node test-screenshot-fix.js)",
       "Bash(cd /Users/free/Projects/candlebot/backend && python -m py_compile routers/analysis.py)",
-      "Bash(cd /Users/free/Projects/candlebot/backend && python3 -m py_compile routers/analysis.py)"
+      "Bash(cd /Users/free/Projects/candlebot/backend && python3 -m py_compile routers/analysis.py)",
+      "Bash(python3 -c \"\nfrom database import engine\nfrom sqlalchemy import inspect\n\ninspector = inspect\\(engine\\)\ncolumns = inspector.get_columns\\('analysis_records'\\)\nprint\\('analysis_records表结构:'\\)\nfor col in columns:\n    print\\(f'  {col[\\\\\"name\\\\\"]}: {col[\\\\\"type\\\\\"]}'\\)\n\")",
+      "Bash(python3 add_visibility_field.py)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m venv venv)",
+      "Bash(source venv/bin/activate && pip install -r requirements.txt)",
+      "Bash(source venv/bin/activate && python3 add_visibility_field.py)",
+      "Bash(source venv/bin/activate && python3 simple_migration.py)",
+      "Bash(ls -la *.db)",
+      "Bash(source venv/bin/activate && python3 check_db.py)"
     ]
   }
 }
