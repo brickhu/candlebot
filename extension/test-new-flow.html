@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot扩展新流程测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-case {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-case h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .step:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+        .expected {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .expected:before {
+            content: "预期结果: ";
+            font-weight: bold;
+            color: #059669;
+        }
+        .note {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .note:before {
+            content: "注意: ";
+            font-weight: bold;
+            color: #d97706;
+        }
+        .supported-sites {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .site-tag {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>Candlebot扩展新流程测试指南</h1>
+
+    <div class="note">
+        此文档描述了扩展的新工作流程。请按照以下步骤测试功能是否正常工作。
+    </div>
+
+    <div class="test-case">
+        <h3>测试用例1: 在支持的网站上自动截图</h3>
+
+        <div class="step">访问一个支持的K线图表网站（如TradingView、aggr.trade等）</div>
+        <div class="step">打开一个具体的图表页面（如BTC/USDT图表）</div>
+        <div class="step">点击浏览器工具栏中的Candlebot扩展图标</div>
+
+        <div class="expected">扩展会自动截图，保存截图数据，并显示弹窗</div>
+        <div class="expected">弹窗中会显示截图预览和图表信息</div>
+        <div class="expected">主按钮显示为"立即分析"（绿色发光效果）</div>
+    </div>
+
+    <div class="test-case">
+        <h3>测试用例2: 弹窗中预览和跳转</h3>
+
+        <div class="step">在弹窗中查看截图预览（应该能看到当前图表的截图）</div>
+        <div class="step">查看图表信息（交易对、时间框架、交易所、网站）</div>
+        <div class="step">点击"立即分析"按钮</div>
+
+        <div class="expected">弹窗关闭，新标签页打开分析页面</div>
+        <div class="expected">分析页面URL包含扩展标记和截图数据</div>
+        <div class="expected">分析页面自动加载截图并准备分析</div>
+    </div>
+
+    <div class="test-case">
+        <h3>测试用例3: 重新截图功能</h3>
+
+        <div class="step">在弹窗中点击"重新截图"按钮</div>
+        <div class="step">截图预览被清除，显示占位符</div>
+        <div class="step">再次点击扩展图标（或点击"截图并分析"按钮）</div>
+
+        <div class="expected">重新执行截图流程</div>
+        <div class="expected">新的截图显示在弹窗中</div>
+    </div>
+
+    <div class="test-case">
+        <h3>测试用例4: 不支持页面处理</h3>
+
+        <div class="step">访问一个不支持的网站（如Google、GitHub等）</div>
+        <div class="step">点击扩展图标</div>
+
+        <div class="expected">弹窗显示不支持提示</div>
+        <div class="expected">显示支持网站列表</div>
+        <div class="expected">提供常用链接导航到支持的网站</div>
+    </div>
+
+    <div class="test-case">
+        <h3>支持的网站列表</h3>
+
+        <div class="supported-sites">
+            <span class="site-tag">TradingView</span>
+            <span class="site-tag">aggr.trade</span>
+            <span class="site-tag">DEXTools</span>
+            <span class="site-tag">DEXScreener</span>
+            <span class="site-tag">Birdeye</span>
+            <span class="site-tag">GeckoTerminal</span>
+        </div>
+
+        <div class="note">
+            注意：扩展只在这些网站的图表页面上自动截图。在首页或其他页面会显示提示信息。
+        </div>
+    </div>
+
+    <div class="test-case">
+        <h3>故障排除</h3>
+
+        <div class="step">如果截图失败，检查浏览器控制台（F12）的错误信息</div>
+        <div class="step">确保扩展已正确加载（检查扩展管理页面）</div>
+        <div class="step">测试web app连接（弹窗中的"测试连接"按钮）</div>
+        <div class="step">清理扩展数据（弹窗中的"清理数据"按钮）后重试</div>
+
+        <div class="note">
+            常见问题：<br>
+            1. 内容脚本未加载 - 确保在支持的网站上<br>
+            2. 截图权限问题 - 检查扩展权限<br>
+            3. Web app连接失败 - 检查本地服务器是否运行<br>
+            4. 数据传递失败 - 尝试清理数据后重试
+        </div>
+    </div>
+
+    <script>
+        // 简单的测试页面交互
+        document.addEventListener('DOMContentLoaded', function() {
+            const testCases = document.querySelectorAll('.test-case');
+            testCases.forEach((testCase, index) => {
+                const header = testCase.querySelector('h3');
+                header.addEventListener('click', function() {
+                    testCase.classList.toggle('expanded');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

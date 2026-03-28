@@ -54,7 +54,22 @@
       "Bash(find /Users/free/Projects/candlebot -type f -name \"*.log\" -o -name \"*.tmp\" -o -name \"temp*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
       "Bash(find /Users/free/Projects/candlebot -type d -name \"venv*\" -o -name \".venv*\" 2>/dev/null | grep -v node_modules | grep -v \".git\")",
       "Bash(npm run:*)",
-      "Bash(node -c /Users/free/Projects/candlebot/app/src/pages/Dashboard.jsx 2>&1)"
+      "Bash(node -c /Users/free/Projects/candlebot/app/src/pages/Dashboard.jsx 2>&1)",
+      "Bash(chmod +x /Users/free/Projects/candlebot/extension/clean-and-test.sh)",
+      "Bash(cd /Users/free/Projects/candlebot/extension && ./clean-and-test.sh)",
+      "Bash(curl -s http://localhost:5173 | head -5)",
+      "Bash(cd /Users/free/Projects/candlebot/extension && node verify-installation.js)",
+      "Bash(chmod +x /Users/free/Projects/candlebot/extension/setup-simple.sh)",
+      "Bash(./setup-simple.sh)",
+      "Bash(node test-site-detection.js)",
+      "Bash(chmod +x create-simple-icons.sh && ./create-simple-icons.sh)",
+      "Bash(ls -la icons/*.png)",
+      "Bash(node verify-structure.js)",
+      "Bash(node test-aggr-config.js)",
+      "Bash(cd /Users/free/Projects/candlebot/extension && node test-screenshot-fix.js)",
+      "Bash(node test-screenshot-fix.js)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python -m py_compile routers/analysis.py)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python3 -m py_compile routers/analysis.py)"
     ]
   }
 }

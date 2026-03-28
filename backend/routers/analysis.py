@@ -3,7 +3,7 @@
 """
 import hashlib
 import json
-from typing import List
+from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -67,24 +67,57 @@ async def get_analysis_history(
     )
 
 
-@router.get("/{record_id}", response_model=schemas.AnalysisRecordInDB)
+@router.get("/{record_id}", response_model=Union[schemas.AnalysisRecordInDB, schemas.AnalysisRecordPublic])
 async def get_analysis_record(
     record_id: int,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """获取单个分析记录详情"""
+    """获取单个分析记录详情
+
+    如果记录是公开的，任何人都可以访问（返回公开信息）
+    如果记录是私有的，只有所有者可以访问（返回完整信息）
+    """
+    # 查询记录
     record = db.query(models.AnalysisRecord).filter(
-        models.AnalysisRecord.id == record_id,
-        models.AnalysisRecord.user_id == current_user.id
+        models.AnalysisRecord.id == record_id
     ).first()
 
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="分析记录不存在或无权访问"
+            detail="分析记录不存在"
         )
 
+    # 如果是公开记录，任何人都可以访问
+    if record.visibility == "public":
+        # 返回公开信息（不包含report_data）
+        return schemas.AnalysisRecordPublic(
+            id=record.id,
+            user_id=record.user_id,
+            platform=record.platform,
+            image_hash=record.image_hash,
+            analysis_metadata=record.analysis_metadata,
+            visibility=record.visibility,
+            created_at=record.created_at,
+            has_image=bool(record.image_data)
+        )
+
+    # 如果是私有记录，需要认证
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要认证才能访问私有记录"
+        )
+
+    # 检查是否是记录所有者
+    if record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权访问此记录"
+        )
+
+    # 所有者访问，返回完整信息
     return record
 
 
@@ -138,6 +171,46 @@ async def get_analysis_image(
 
     # 返回base64编码的图片
     return {"image_data": record.image_data}
+
+
+@router.put("/{record_id}/visibility", response_model=schemas.SuccessResponse)
+async def update_analysis_visibility(
+    record_id: int,
+    visibility_data: dict,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """更新分析记录的可见性（private/public）"""
+    if "visibility" not in visibility_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少visibility字段"
+        )
+
+    visibility = visibility_data["visibility"]
+    if visibility not in ["private", "public"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="visibility必须是'private'或'public'"
+        )
+
+    # 查询记录
+    record = db.query(models.AnalysisRecord).filter(
+        models.AnalysisRecord.id == record_id,
+        models.AnalysisRecord.user_id == current_user.id
+    ).first()
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="分析记录不存在或无权访问"
+        )
+
+    # 更新可见性
+    record.visibility = visibility
+    db.commit()
+
+    return schemas.SuccessResponse(message=f"记录可见性已更新为'{visibility}'")
 
 
 @router.get("/stats/summary")

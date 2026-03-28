@@ -1,7 +1,9 @@
-import { createSignal } from 'solid-js'
+import { createSignal, onMount } from 'solid-js'
 import { useNavigate, A } from '@solidjs/router'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
+import { redirectAfterAuth } from '../lib/redirect'
+
 
 const LoginPage = () => {
   const [email, setEmail] = createSignal('')
@@ -12,6 +14,26 @@ const LoginPage = () => {
   const auth = useAuth()
   const navigate = useNavigate()
 
+  // 获取重定向来源（兼容旧代码）
+  const getRedirectPath = () => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const from = urlParams.get('from')
+    console.log('登录页面，重定向来源:', from)
+
+    if (from) {
+      try {
+        const decodedFrom = decodeURIComponent(from)
+        console.log('解码后的重定向来源:', decodedFrom)
+        return decodedFrom
+      } catch (error) {
+        console.error('解码from参数失败:', error)
+        return from
+      }
+    }
+
+    return '/dashboard'
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -20,7 +42,9 @@ const LoginPage = () => {
     try {
       const success = await auth.login(email(), password())
       if (success) {
-        navigate('/dashboard')
+        console.log('Login successful')
+        navigate(-1)
+        // redirectAfterAuth(navigate)
       } else {
         setError('Invalid email or password')
       }
@@ -120,7 +144,7 @@ const LoginPage = () => {
                 onInput={(e) => setEmail(e.currentTarget.value)}
                 required
                 class="w-full px-4 py-3 bg-bg border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-colors"
-                placeholder="you@example.com"
+                placeholder="Email"
               />
             </div>
 
@@ -140,7 +164,7 @@ const LoginPage = () => {
                 onInput={(e) => setPassword(e.currentTarget.value)}
                 required
                 class="w-full px-4 py-3 bg-bg border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-colors"
-                placeholder="••••••••"
+                placeholder="Password"
               />
             </div>
 
@@ -155,14 +179,17 @@ const LoginPage = () => {
                   Signing in...
                 </span>
               ) : (
-                'Sign In'
+                <span class="flex items-center justify-center gap-2">
+                  Sign In
+                </span>
+                
               )}
             </button>
           </form>
 
           <div class="mt-8 text-center text-sm text-muted">
             Don't have an account?{' '}
-            <A href="/register" class="text-primary hover:text-primary-dark font-medium">
+            <A href={`/register?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark font-medium">
               Sign up
             </A>
           </div>

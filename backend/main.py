@@ -461,7 +461,8 @@ async def analyze(
                 "raw": raw,
                 "lang": req.lang
             },
-            analysis_metadata=meta
+            analysis_metadata=meta,
+            visibility=req.visibility  # 设置可见性
         )
         db.add(db_record)
         db.commit()

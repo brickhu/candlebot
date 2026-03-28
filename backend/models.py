@@ -47,6 +47,7 @@ class AnalysisRecord(Base):
     image_data = Column(Text)        # base64编码的图片（可选存储）
     report_data = Column(JSON, nullable=False)  # 完整的报告数据
     analysis_metadata = Column(JSON, nullable=False)     # 元数据：rating, pair, price等
+    visibility = Column(String(20), default="private")   # 可见性：private/public
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 关系

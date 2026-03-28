@@ -1,8 +1,9 @@
 import { createSignal, onMount } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
 import { extractOAuthCodeFromUrl, verifyOAuthState, clearOAuthProvider, getRedirectUri } from '../lib/oauth'
+import { redirectAfterAuth } from '../lib/redirect'
 
 const OAuthCallbackPage = () => {
   const [status, setStatus] = createSignal('processing')
@@ -104,9 +105,10 @@ const OAuthCallbackPage = () => {
 
       setStatus('success')
 
-      // 2秒后跳转到仪表板
+      // 2秒后执行重定向
       setTimeout(() => {
-        navigate('/dashboard')
+        console.log('OAuth登录成功，执行重定向')
+        redirectAfterAuth(navigate)
       }, 2000)
 
     } catch (err) {

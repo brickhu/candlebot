@@ -1,29 +1,48 @@
 @import "tailwindcss";
-@plugin "daisyui";
-
-/* Tailwind 4.0 Theme Configuration */
 @theme {
-  /* Colors */
-  --color-bg: #06060f;
-  --color-surface: #0f0f1a;
-  --color-border: #1e1e30;
-  --color-green: #00e87a;
-  --color-red: #ff3b5c;
-  --color-neutral: #666680;
-  --color-accent: #7c6aff;
-  --color-gold: #c49a3c;
-  --color-text: #e2e2f0;
-  --color-muted: #555570;
 
-  /* Font Families */
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
-  --font-sans: "Inter", system-ui, sans-serif;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+@plugin "daisyui";
+@plugin "daisyui/theme" {
+  name: "earlybirds";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(100% 0 0);
+  --color-base-200: oklch(98% 0.001 106.423);
+  --color-base-300: oklch(92% 0.003 48.717);
+  --color-base-content: oklch(21% 0.006 56.043);
+  --color-primary: oklch(70% 0.213 47.604);
+  --color-primary-content: oklch(98% 0.022 95.277);
+  --color-secondary: oklch(60% 0.25 292.717);
+  --color-secondary-content: oklch(98% 0.016 73.684);
+  --color-accent: oklch(90% 0.076 70.697);
+  --color-accent-content: oklch(26% 0.079 36.259);
+  --color-neutral: oklch(26% 0.007 34.298);
+  --color-neutral-content: oklch(98% 0 0);
+  --color-info: oklch(54% 0.245 262.881);
+  --color-info-content: oklch(98% 0.003 247.858);
+  --color-success: oklch(62% 0.194 149.214);
+  --color-success-content: oklch(98% 0.018 155.826);
+  --color-warning: oklch(82% 0.189 84.429);
+  --color-warning-content: oklch(100% 0 0);
+  --color-error: oklch(57% 0.245 27.325);
+  --color-error-content: oklch(97% 0.013 17.38);
+  --radius-selector: 0rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 1;
+}
+
+
 
 body {
-  background: var(--color-bg);
+  background: var(--color-base-100);
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

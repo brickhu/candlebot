@@ -1,14 +1,191 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Candlebot · K线专家</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot · K线分析助手</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="m-0 p-0 overflow-hidden">
-  <div id="root"></div>
-  <script type="module" src="./index.jsx"></script>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="title-section">
+                <h1 class="title">Candlebot</h1>
+                <p class="subtitle">K线分析助手</p>
+            </div>
+            <div class="environment-badge" id="environmentBadge">
+                <span class="env-text">本地</span>
+                <i class="fas fa-server"></i>
+            </div>
+        </div>
+
+        <!-- 状态区域 -->
+        <div class="status-section" id="statusSection">
+            <div class="status-loading">
+                <div class="spinner"></div>
+                <p>检查当前页面...</p>
+            </div>
+        </div>
+
+        <!-- 截图预览区域 -->
+        <div class="screenshot-section hidden" id="screenshotSection">
+            <div class="section-header">
+                <h3><i class="fas fa-camera"></i> 截图预览</h3>
+                <button class="btn-icon" id="refreshScreenshot" title="重新截图">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div class="screenshot-preview" id="screenshotPreview">
+                <div class="screenshot-placeholder">
+                    <i class="fas fa-image"></i>
+                    <p>点击下方按钮截图</p>
+                </div>
+            </div>
+            <div class="screenshot-info" id="screenshotInfo">
+                <div class="info-row">
+                    <span class="info-label">尺寸:</span>
+                    <span class="info-value" id="screenshotSize">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">时间:</span>
+                    <span class="info-value" id="screenshotTime">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表信息区域 -->
+        <div class="info-section hidden" id="infoSection">
+            <div class="section-header">
+                <h3><i class="fas fa-info-circle"></i> 图表信息</h3>
+            </div>
+            <div class="info-grid" id="chartInfo">
+                <div class="info-item">
+                    <span class="info-label">交易对:</span>
+                    <span class="info-value" id="infoSymbol">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">时间框架:</span>
+                    <span class="info-value" id="infoTimeframe">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">交易所:</span>
+                    <span class="info-value" id="infoExchange">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">网站:</span>
+                    <span class="info-value" id="infoSite">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮区域 -->
+        <div class="actions-section hidden" id="actionsSection">
+            <button class="btn-primary" id="captureBtn">
+                <i class="fas fa-camera"></i> 截图并分析
+            </button>
+            <button class="btn-secondary" id="retryCaptureBtn">
+                <i class="fas fa-redo"></i> 重新截图
+            </button>
+        </div>
+
+        <!-- 不支持页面提示 -->
+        <div class="unsupported-section hidden" id="unsupportedSection">
+            <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>当前页面不支持</h3>
+            <p id="unsupportedReason">请访问支持的K线图表网站</p>
+
+            <div class="supported-sites">
+                <h4>支持的网站:</h4>
+                <div class="site-tags">
+                    <span class="site-tag">TradingView</span>
+                    <span class="site-tag">aggr.trade</span>
+                    <span class="site-tag">DEXTools</span>
+                    <span class="site-tag">DEXScreener</span>
+                    <span class="site-tag">Birdeye</span>
+                    <span class="site-tag">GeckoTerminal</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 常用链接区域 -->
+        <div class="links-section">
+            <div class="section-header">
+                <h3><i class="fas fa-link"></i> 常用链接</h3>
+            </div>
+            <div class="links-grid">
+                <a href="https://www.tradingview.com/chart/" class="link-item" target="_blank">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>TradingView</span>
+                </a>
+                <a href="https://aggr.trade/" class="link-item" target="_blank">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>Aggr.trade</span>
+                </a>
+                <a href="https://www.dextools.io/" class="link-item" target="_blank">
+                    <i class="fas fa-tools"></i>
+                    <span>DEXTools</span>
+                </a>
+                <a href="https://dexscreener.com/" class="link-item" target="_blank">
+                    <i class="fas fa-search"></i>
+                    <span>DEXScreener</span>
+                </a>
+                <a href="http://localhost:5173/dashboard" class="link-item" id="openDashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>仪表板</span>
+                </a>
+                <a href="http://localhost:5173/new" class="link-item" id="openNewAnalysis">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>新建分析</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 设置区域 -->
+        <div class="settings-section">
+            <div class="section-header">
+                <h3><i class="fas fa-cog"></i> 设置</h3>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label for="environmentSelect">环境:</label>
+                    <select id="environmentSelect" class="select">
+                        <option value="development">本地开发</option>
+                        <option value="production">生产环境</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <button class="btn-small" id="testConnectionBtn">
+                        <i class="fas fa-wifi"></i> 测试连接
+                    </button>
+                    <button class="btn-small" id="clearDataBtn">
+                        <i class="fas fa-trash"></i> 清理数据
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部状态 -->
+        <div class="footer">
+            <div class="footer-status" id="footerStatus">
+                <i class="fas fa-circle status-dot"></i>
+                <span>就绪</span>
+            </div>
+            <div class="footer-version">
+                v1.0.0
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <script src="script.js"></script>
 </body>
 </html>

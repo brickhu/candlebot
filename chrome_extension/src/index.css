@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-candle: #00ff88;
+}
+
+body {
+  @apply bg-slate-50 antialiased m-0 p-0;
+}

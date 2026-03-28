@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(node -e \"\nconst url = 'http://localhost:5173/new?from_extension=true';\nconst encoded = encodeURIComponent\\(url\\);\nconsole.log\\('原始URL:', url\\);\nconsole.log\\('编码后:', encoded\\);\nconsole.log\\('解码后:', decodeURIComponent\\(encoded\\)\\);\n\")"
+    ]
+  }
+}

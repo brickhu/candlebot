@@ -1,45 +1,64 @@
 {
   "manifest_version": 3,
-  "name": "Candlebot · K线专家",
+  "name": "Candlebot K线分析助手",
   "version": "1.0.0",
-  "description": "AI读懂K线图表，一键生成做多做空分析报告 | AI-powered chart analysis for aggr.trade & TradingView",
+  "description": "一键截图K线图表并发送到Candlebot进行AI分析",
   "icons": {
-    "16":  "public/icons/icon16.png",
-    "48":  "public/icons/icon48.png",
-    "128": "public/icons/icon128.png"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "action": {
     "default_popup": "src/popup/index.html",
+    "default_title": "Candlebot K线分析助手",
     "default_icon": {
-      "16":  "public/icons/icon16_off.png",
-      "48":  "public/icons/icon48_off.png",
-      "128": "public/icons/icon128_off.png"
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
-  "chrome_url_overrides": {
-    "newtab": "src/dashboard/index.html"
-  },
   "background": {
-    "service_worker": "src/background/index.js",
-    "type": "module"
+    "service_worker": "src/background/simple-background.js"
   },
   "content_scripts": [
     {
       "matches": [
-        "*://aggr.trade/*",
+        "*://*.tradingview.com/*",
         "*://*.aggr.trade/*",
-        "*://www.tradingview.com/*",
-        "*://tradingview.com/*"
+        "*://*.dextools.io/*",
+        "*://*.dexscreener.com/*",
+        "*://*.birdeye.so/*",
+        "*://*.geckoterminal.com/*"
       ],
       "js": ["src/content/index.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.tradingview.com/*"],
+      "js": ["src/content/tradingview.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.aggr.trade/*"],
+      "js": ["src/content/aggr.js"],
+      "run_at": "document_idle"
     }
   ],
-  "permissions": ["activeTab", "storage", "tabs", "scripting", "identity"],
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "scripting"
+  ],
   "host_permissions": [
-    "*://aggr.trade/*",
-    "*://*.aggr.trade/*",
-    "*://www.tradingview.com/*",
-    "*://tradingview.com/*"
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
+    "https://chat.candlebot.app/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

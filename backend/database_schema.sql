@@ -36,12 +36,14 @@ CREATE TABLE analysis_records (
     image_data TEXT,                -- base64编码的图片（可选存储）
     report_data JSONB NOT NULL,     -- 完整的报告数据
     analysis_metadata JSONB NOT NULL,        -- 元数据：rating, pair, price等
+    visibility VARCHAR(20) DEFAULT 'private', -- 可见性：private/public
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     -- 索引
     INDEX idx_user_created (user_id, created_at DESC),
     INDEX idx_platform (platform),
-    INDEX idx_pair (analysis_metadata->>'pair')
+    INDEX idx_pair (analysis_metadata->>'pair'),
+    INDEX idx_visibility (visibility)
 );
 
 -- 对话记录表

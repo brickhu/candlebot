@@ -1,6 +1,13 @@
+let mode = import.meta.env.MODE || "development"
+let app_name = import.meta.env.APP_NAME || "candlebot"
+let KEYS = Object.freeze({
+  AUTH_TOKEN : app_name+"_auth_token_"+mode,
+  
+})
+
 // 根据环境配置API基础URL
 const getApiBaseUrl = () => {
-  const mode = import.meta.env.MODE
+  
 
   switch (mode) {
     case 'development':
@@ -20,7 +27,7 @@ const API_BASE_URL = getApiBaseUrl()
 class ApiClient {
   constructor(baseUrl = API_BASE_URL) {
     this.baseUrl = baseUrl
-    this.token = localStorage.getItem('auth_token')
+    this.token = localStorage.getItem(KEYS.AUTH_TOKEN)
   }
 
   async request(endpoint, options = {}) {
@@ -170,17 +177,26 @@ class ApiClient {
   // Utility methods
   setToken(token) {
     this.token = token
-    localStorage.setItem('auth_token', token)
+    localStorage.setItem(KEYS.AUTH_TOKEN, token)
+    console.log("setToken(): 已设置token，长度:", token?.length || 0)
   }
 
   clearToken() {
     this.token = null
-    localStorage.removeItem('auth_token')
+    localStorage.removeItem(KEYS.AUTH_TOKEN)
   }
 
   isAuthenticated() {
-    console.log("isAuthenticated():",this.token)
-    return !!this.token
+    // 每次都从localStorage检查，确保获取最新的token状态
+    const currentToken = localStorage.getItem(KEYS.AUTH_TOKEN)
+    // console.log("isAuthenticated(): localStorage token:", currentToken ? "有" : "无", "实例token:", this.token ? "有" : "无")
+
+    // 如果localStorage有token但实例没有，更新实例
+    if (currentToken && !this.token) {
+      this.token = currentToken
+    }
+
+    return !!currentToken
   }
 }
 

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片传递修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+            border-left: 3px solid #ccc;
+        }
+        .log-entry.info { border-left-color: #007bff; }
+        .log-entry.success { border-left-color: #28a745; }
+        .log-entry.error { border-left-color: #dc3545; }
+        .log-entry.warning { border-left-color: #ffc107; }
+        .test-image {
+            max-width: 300px;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片传递修复测试</h1>
+
+    <div class="test-section">
+        <h2>1. 测试数据格式转换</h2>
+        <p>测试extractPureBase64函数：</p>
+        <div id="formatTestStatus">等待测试...</div>
+        <button onclick="testExtractPureBase64()">测试extractPureBase64</button>
+        <button onclick="testRegex()">测试正则表达式</button>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 模拟扩展数据传递</h2>
+        <p>模拟扩展传递图片数据的不同方式：</p>
+        <div id="simulationStatus">等待测试...</div>
+        <button onclick="simulateUrlParams()">模拟URL参数传递</button>
+        <button onclick="simulateLocalStorage()">模拟localStorage传递</button>
+        <button onclick="simulateSessionStorage()">模拟sessionStorage传递</button>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 测试图片处理</h2>
+        <p>测试base64ToBlob函数：</p>
+        <div id="imageTestStatus">等待测试...</div>
+        <button onclick="testBase64ToBlob()">测试base64ToBlob</button>
+        <div id="imagePreview"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 完整流程测试</h2>
+        <p>模拟完整的数据传递流程：</p>
+        <div id="fullTestStatus">等待测试...</div>
+        <button onclick="runFullTest()">运行完整测试</button>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 测试日志</h2>
+        <div id="log"></div>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+            log('日志已清空', 'info');
+        }
+
+        // 1. 测试extractPureBase64函数
+        function extractPureBase64(dataUrl) {
+            if (!dataUrl) return null;
+            if (!dataUrl.startsWith('data:')) return dataUrl;
+
+            // 使用更灵活的正则表达式匹配各种格式
+            const base64Match = dataUrl.match(/^data:image\/[a-zA-Z0-9+.-]+;base64,(.+)$/);
+            return base64Match ? base64Match[1] : dataUrl;
+        }
+
+        function testExtractPureBase64() {
+            const statusDiv = document.getElementById('formatTestStatus');
+            statusDiv.innerHTML = '测试中...';
+
+            const testCases = [
+                {
+                    input: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==',
+                    expected: 'iVBORw0KGgoAAAANSUhEUg==',
+                    description: '标准PNG格式'
+                },
+                {
+                    input: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD==',
+                    expected: '/9j/4AAQSkZJRgABAQEAYABgAAD==',
+                    description: '标准JPEG格式'
+                },
+                {
+                    input: 'data:image/jpg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD==',
+                    expected: '/9j/4AAQSkZJRgABAQEAYABgAAD==',
+                    description: 'JPG格式'
+                },
+                {
+                    input: 'iVBORw0KGgoAAAANSUhEUg==',
+                    expected: 'iVBORw0KGgoAAAANSUhEUg==',
+                    description: '纯base64（无前缀）'
+                }
+            ];
+
+            let allPassed = true;
+            let results = [];
+
+            testCases.forEach((testCase, index) => {
+                const result = extractPureBase64(testCase.input);
+                const passed = result === testCase.expected;
+                allPassed = allPassed && passed;
+
+                results.push(`
+                    <div class="${passed ? 'success' : 'error'}">
+                        ${passed ? '✅' : '❌'} ${testCase.description}: ${passed ? '通过' : '失败'}
+                        ${!passed ? `<br>输入: ${testCase.input.substring(0, 50)}...<br>期望: ${testCase.expected}<br>实际: ${result}` : ''}
+                    </div>
+                `);
+
+                log(`测试${index + 1}: ${testCase.description} - ${passed ? '通过' : '失败'}`, passed ? 'success' : 'error');
+            });
+
+            statusDiv.innerHTML = `
+                <strong>测试结果:</strong> ${allPassed ? '<span class="success">✅ 全部通过</span>' : '<span class="error">❌ 有测试失败</span>'}
+                ${results.join('')}
+            `;
+        }
+
+        function testRegex() {
+            const statusDiv = document.getElementById('formatTestStatus');
+            statusDiv.innerHTML = '测试正则表达式...';
+
+            const regex = /^data:image\/[a-zA-Z0-9+.-]+;base64,(.+)$/;
+            const testStrings = [
+                'data:image/png;base64,abc123',
+                'data:image/jpeg;base64,abc123',
+                'data:image/jpg;base64,abc123',
+                'data:image/webp;base64,abc123',
+                'data:image/gif;base64,abc123',
+                'data:image/svg+xml;base64,abc123',
+                'data:image/bmp;base64,abc123',
+                'invalid:image/png;base64,abc123',
+                'data:image/png;base64',
+                'purebase64string'
+            ];
+
+            let results = [];
+            testStrings.forEach(str => {
+                const match = str.match(regex);
+                results.push(`
+                    <div>
+                        <strong>${str}</strong>: ${match ? '✅ 匹配' : '❌ 不匹配'}
+                        ${match ? `<br>提取内容: ${match[1]}` : ''}
+                    </div>
+                `);
+                log(`正则测试: "${str}" - ${match ? '匹配' : '不匹配'}`, match ? 'success' : 'info');
+            });
+
+            statusDiv.innerHTML = `
+                <strong>正则表达式测试:</strong>
+                ${results.join('')}
+            `;
+        }
+
+        // 2. 模拟扩展数据传递
+        function simulateUrlParams() {
+            const statusDiv = document.getElementById('simulationStatus');
+            statusDiv.innerHTML = '模拟URL参数传递...';
+
+            // 创建一个测试图片的base64数据（很小的图片）
+            const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+            // 模拟扩展生成的URL
+            const url = new URL(window.location);
+            url.searchParams.set('from_extension', 'true');
+            url.searchParams.set('image_data', encodeURIComponent(testBase64));
+            url.searchParams.set('image_format', 'png');
+            url.searchParams.set('data_source', 'url_params');
+
+            const simulatedUrl = url.toString();
+
+            // 模拟web app检查
+            const urlParams = new URLSearchParams(url.search);
+            const fromExtension = urlParams.get('from_extension');
+            const imageData = urlParams.get('image_data');
+            const imageFormat = urlParams.get('image_format');
+
+            if (fromExtension === 'true' && imageData) {
+                const decodedData = decodeURIComponent(imageData);
+                const pureBase64 = extractPureBase64(decodedData);
+
+                statusDiv.innerHTML = `
+                    <span class="success">✅ URL参数传递模拟成功</span><br>
+                    <strong>模拟URL:</strong> ${simulatedUrl.substring(0, 100)}...<br>
+                    <strong>URL长度:</strong> ${simulatedUrl.length} 字符<br>
+                    <strong>图片数据长度:</strong> ${pureBase64.length} 字符<br>
+                    <strong>图片格式:</strong> ${imageFormat}<br>
+                    <strong>数据源:</strong> ${urlParams.get('data_source')}
+                `;
+                log('URL参数传递模拟成功', 'success');
+            } else {
+                statusDiv.innerHTML = '<span class="error">❌ URL参数传递模拟失败</span>';
+                log('URL参数传递模拟失败', 'error');
+            }
+        }
+
+        function simulateLocalStorage() {
+            const statusDiv = document.getElementById('simulationStatus');
+            statusDiv.innerHTML = '模拟localStorage传递...';
+
+            // 创建一个测试图片的base64数据
+            const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+            const metadata = {
+                imageFormat: 'png',
+                timestamp: new Date().toISOString(),
+                source: 'local_storage_simulation'
+            };
+
+            // 模拟扩展存储数据
+            localStorage.setItem('candlebot_extension_image', testBase64);
+            localStorage.setItem('candlebot_extension_metadata', JSON.stringify(metadata));
+
+            // 模拟web app检查
+            const storedImageData = localStorage.getItem('candlebot_extension_image');
+            const storedMetadata = localStorage.getItem('candlebot_extension_metadata');
+
+            if (storedImageData) {
+                let imageFormat = 'png';
+                if (storedMetadata) {
+                    try {
+                        const meta = JSON.parse(storedMetadata);
+                        imageFormat = meta.imageFormat || 'png';
+                    } catch (e) {
+                        console.warn('解析元数据失败:', e);
+                    }
+                }
+
+                statusDiv.innerHTML = `
+                    <span class="success">✅ localStorage传递模拟成功</span><br>
+                    <strong>图片数据长度:</strong> ${storedImageData.length} 字符<br>
+                    <strong>图片格式:</strong> ${imageFormat}<br>
+                    <strong>元数据:</strong> ${storedMetadata}
+                `;
+                log('localStorage传递模拟成功', 'success');
+
+                // 清理测试数据
+                localStorage.removeItem('candlebot_extension_image');
+                localStorage.removeItem('candlebot_extension_metadata');
+            } else {
+                statusDiv.innerHTML = '<span class="error">❌ localStorage传递模拟失败</span>';
+                log('localStorage传递模拟失败', 'error');
+            }
+        }
+
+        function simulateSessionStorage() {
+            const statusDiv = document.getElementById('simulationStatus');
+            statusDiv.innerHTML = '模拟sessionStorage传递...';
+
+            // 创建一个测试图片的base64数据
+            const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+            // 模拟扩展存储数据
+            sessionStorage.setItem('candlebot_extension_image', testBase64);
+
+            // 模拟web app检查
+            const sessionImageData = sessionStorage.getItem('candlebot_extension_image');
+
+            if (sessionImageData) {
+                statusDiv.innerHTML = `
+                    <span class="success">✅ sessionStorage传递模拟成功</span><br>
+                    <strong>图片数据长度:</strong> ${sessionImageData.length} 字符<br>
+                    <strong>注意:</strong> sessionStorage不跨标签页共享
+                `;
+                log('sessionStorage传递模拟成功', 'success');
+
+                // 清理测试数据
+                sessionStorage.removeItem('candlebot_extension_image');
+            } else {
+                statusDiv.innerHTML = '<span class="error">❌ sessionStorage传递模拟失败</span>';
+                log('sessionStorage传递模拟失败', 'error');
+            }
+        }
+
+        // 3. 测试图片处理
+        function base64ToBlob(base64, imageFormat = 'png') {
+            try {
+                const byteCharacters = atob(base64);
+                const byteArrays = [];
+
+                for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                    const slice = byteCharacters.slice(offset, offset + 512);
+                    const byteNumbers = new Array(slice.length);
+                    for (let i = 0; i < slice.length; i++) {
+                        byteNumbers[i] = slice.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    byteArrays.push(byteArray);
+                }
+
+                const mimeType = imageFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+                return new Blob(byteArrays, { type: mimeType });
+            } catch (err) {
+                console.error('base64ToBlob错误:', err);
+                throw err;
+            }
+        }
+
+        function testBase64ToBlob() {
+            const statusDiv = document.getElementById('imageTestStatus');
+            const imagePreview = document.getElementById('imagePreview');
+            statusDiv.innerHTML = '测试base64ToBlob...';
+            imagePreview.innerHTML = '';
+
+            // 创建一个1x1像素的PNG图片base64
+            const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+            try {
+                // 测试PNG格式
+                const pngBlob = base64ToBlob(testBase64, 'png');
+                const pngFile = new File([pngBlob], 'test.png', { type: 'image/png' });
+
+                // 测试JPEG格式
+                const jpegBlob = base64ToBlob(testBase64, 'jpeg');
+                const jpegFile = new File([jpegBlob], 'test.jpg', { type: 'image/jpeg' });
+
+                statusDiv.innerHTML = `
+                    <span class="success">✅ base64ToBlob测试成功</span><br>
+                    <strong>PNG文件:</strong> ${pngFile.name}, 大小: ${pngFile.size} bytes, 类型: ${pngFile.type}<br>
+                    <strong>JPEG文件:</strong> ${jpegFile.name}, 大小: ${jpegFile.size} bytes, 类型: ${jpegFile.type}
+                `;
+
+                // 创建图片预览
+                const pngUrl = `data:image/png;base64,${testBase64}`;
+                const img = document.createElement('img');
+                img.src = pngUrl;
+                img.alt = '测试图片';
+                img.className = 'test-image';
+                imagePreview.appendChild(img);
+
+                log('base64ToBlob测试成功', 'success');
+            } catch (err) {
+                statusDiv.innerHTML = `<span class="error">❌ base64ToBlob测试失败: ${err.message}</span>`;
+                log(`base64ToBlob测试失败: ${err.message}`, 'error');
+            }
+        }
+
+        // 4. 完整流程测试
+        function runFullTest() {
+            const statusDiv = document.getElementById('fullTestStatus');
+            statusDiv.innerHTML = '运行完整测试...';
+
+            log('开始完整流程测试', 'info');
+
+            // 步骤1: 模拟扩展截图
+            const testImageDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+            log('步骤1: 模拟扩展截图完成', 'info');
+
+            // 步骤2: 提取纯base64
+            const pureBase64 = extractPureBase64(testImageDataUrl);
+            log(`步骤2: 提取纯base64完成，长度: ${pureBase64.length}`, pureBase64 ? 'success' : 'error');
+
+            if (!pureBase64) {
+                statusDiv.innerHTML = '<span class="error">❌ 完整测试失败: 无法提取纯base64数据</span>';
+                return;
+            }
+
+            // 步骤3: 模拟URL参数传递
+            const encodedData = encodeURIComponent(pureBase64);
+            log(`步骤3: URL编码完成，长度: ${encodedData.length}`, 'info');
+
+            // 步骤4: 模拟web app接收
+            const decodedData = decodeURIComponent(encodedData);
+            const receivedBase64 = extractPureBase64(decodedData);
+            log(`步骤4: web app接收数据完成，长度: ${receivedBase64.length}`, receivedBase64 === pureBase64 ? 'success' : 'error');
+
+            // 步骤5: 创建Blob和File
+            try {
+                const blob = base64ToBlob(receivedBase64, 'png');
+                const file = new File([blob], 'test.png', { type: 'image/png' });
+                log(`步骤5: 创建File完成，名称: ${file.name}, 大小: ${file.size} bytes`, 'success');
+
+                // 步骤6: 创建预览URL
+                const previewUrl = `data:image/png;base64,${receivedBase64}`;
+                log(`步骤6: 创建预览URL完成，长度: ${previewUrl.length}`, 'success');
+
+                statusDiv.innerHTML = `
+                    <span class="success">✅ 完整流程测试成功</span><br>
+                    <strong>测试步骤:</strong><br>
+                    1. ✅ 模拟扩展截图<br>
+                    2. ✅ 提取纯base64数据 (${pureBase64.length} 字符)<br>
+                    3. ✅ URL编码数据 (${encodedData.length} 字符)<br>
+                    4. ✅ web app接收并解码数据<br>
+                    5. ✅ 创建File对象 (${file.size} bytes)<br>
+                    6. ✅ 创建预览URL<br>
+                    <br>
+                    <strong>总结:</strong> 图片数据传递流程正常工作
+                `;
+            } catch (err) {
+                statusDiv.innerHTML = `<span class="error">❌ 完整测试失败: ${err.message}</span>`;
+                log(`完整测试失败: ${err.message}`, 'error');
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('测试页面加载完成', 'info');
+            log('当前URL: ' + window.location.href, 'info');
+            log('测试extractPureBase64函数和正则表达式', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot扩展测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+            border-left: 3px solid #ccc;
+        }
+        .log-entry.info { border-left-color: #007bff; }
+        .log-entry.success { border-left-color: #28a745; }
+        .log-entry.error { border-left-color: #dc3545; }
+        .log-entry.warning { border-left-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <h1>Candlebot扩展测试页面</h1>
+
+    <div class="test-section">
+        <h2>1. 扩展基本信息</h2>
+        <div id="extensionInfo">检查中...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 内容脚本测试</h2>
+        <p>检查内容脚本是否已注入：</p>
+        <div id="contentScriptStatus">检查中...</div>
+        <button onclick="testContentScript()">测试内容脚本</button>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 消息传递测试</h2>
+        <p>测试background脚本和popup之间的通信：</p>
+        <div id="messageTestStatus">等待测试...</div>
+        <button onclick="testPing()">发送PING消息</button>
+        <button onclick="testGetState()">获取扩展状态</button>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 网站支持测试</h2>
+        <p>测试当前URL是否被支持：</p>
+        <div id="urlTestStatus">等待测试...</div>
+        <button onclick="testUrlSupport()">测试URL支持</button>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 测试日志</h2>
+        <div id="log"></div>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+            log('日志已清空', 'info');
+        }
+
+        // 1. 检查扩展基本信息
+        function checkExtensionInfo() {
+            const infoDiv = document.getElementById('extensionInfo');
+
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+                infoDiv.innerHTML = '<span class="error">❌ 未检测到Chrome扩展环境</span>';
+                return;
+            }
+
+            try {
+                const manifest = chrome.runtime.getManifest();
+                infoDiv.innerHTML = `
+                    <span class="success">✅ 扩展环境正常</span><br>
+                    <strong>扩展名称:</strong> ${manifest.name}<br>
+                    <strong>版本:</strong> ${manifest.version}<br>
+                    <strong>描述:</strong> ${manifest.description}<br>
+                    <strong>manifest版本:</strong> ${manifest.manifest_version}
+                `;
+                log('扩展基本信息检查完成', 'success');
+            } catch (error) {
+                infoDiv.innerHTML = `<span class="error">❌ 获取扩展信息失败: ${error.message}</span>`;
+                log(`获取扩展信息失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 2. 测试内容脚本
+        function testContentScript() {
+            const statusDiv = document.getElementById('contentScriptStatus');
+            statusDiv.innerHTML = '测试中...';
+
+            // 检查全局对象是否存在
+            if (window.candlebotExtension) {
+                statusDiv.innerHTML = '<span class="success">✅ 内容脚本已注入</span>';
+                log('内容脚本测试: 已注入', 'success');
+
+                // 测试内容脚本功能
+                try {
+                    const state = window.candlebotExtension.getState();
+                    log(`内容脚本状态: ${JSON.stringify(state, null, 2)}`, 'info');
+                } catch (error) {
+                    log(`获取内容脚本状态失败: ${error.message}`, 'warning');
+                }
+            } else {
+                statusDiv.innerHTML = '<span class="error">❌ 内容脚本未注入</span>';
+                log('内容脚本测试: 未注入', 'error');
+
+                // 尝试手动检查
+                log('检查manifest.json配置...', 'info');
+                log('当前URL: ' + window.location.href, 'info');
+                log('检查是否在支持的网站列表中...', 'info');
+            }
+        }
+
+        // 3. 测试消息传递
+        function testPing() {
+            const statusDiv = document.getElementById('messageTestStatus');
+            statusDiv.innerHTML = '发送PING消息...';
+
+            chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    statusDiv.innerHTML = `<span class="error">❌ 发送消息失败: ${chrome.runtime.lastError.message}</span>`;
+                    log(`PING测试失败: ${chrome.runtime.lastError.message}`, 'error');
+                } else if (response && response.pong) {
+                    statusDiv.innerHTML = `<span class="success">✅ 收到PONG响应 (版本: ${response.version})</span>`;
+                    log(`PING测试成功: ${JSON.stringify(response)}`, 'success');
+                } else {
+                    statusDiv.innerHTML = '<span class="error">❌ 无效的响应</span>';
+                    log('PING测试: 收到无效响应', 'error');
+                }
+            });
+        }
+
+        function testGetState() {
+            const statusDiv = document.getElementById('messageTestStatus');
+            statusDiv.innerHTML = '获取扩展状态...';
+
+            chrome.runtime.sendMessage({ type: 'GET_CURRENT_STATE' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    statusDiv.innerHTML = `<span class="error">❌ 获取状态失败: ${chrome.runtime.lastError.message}</span>`;
+                    log(`获取状态失败: ${chrome.runtime.lastError.message}`, 'error');
+                } else if (response && response.success) {
+                    statusDiv.innerHTML = '<span class="success">✅ 成功获取扩展状态</span>';
+                    log(`扩展状态: ${JSON.stringify(response.state, null, 2)}`, 'info');
+                } else {
+                    statusDiv.innerHTML = `<span class="error">❌ 获取状态失败: ${response?.error || '未知错误'}</span>`;
+                    log(`获取状态失败: ${response?.error || '未知错误'}`, 'error');
+                }
+            });
+        }
+
+        // 4. 测试URL支持
+        function testUrlSupport() {
+            const statusDiv = document.getElementById('urlTestStatus');
+            statusDiv.innerHTML = '测试URL支持...';
+
+            chrome.runtime.sendMessage({
+                type: 'CHECK_SITE_SUPPORT',
+                url: window.location.href
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    statusDiv.innerHTML = `<span class="error">❌ 测试失败: ${chrome.runtime.lastError.message}</span>`;
+                    log(`URL支持测试失败: ${chrome.runtime.lastError.message}`, 'error');
+                } else if (response && response.success) {
+                    const supportedText = response.supported ? '✅ 支持' : '❌ 不支持';
+                    const chartText = response.isChartPage ? '图表页面' : '非图表页面';
+                    statusDiv.innerHTML = `
+                        <span class="${response.supported ? 'success' : 'error'}">${supportedText}</span><br>
+                        <strong>网站:</strong> ${response.site?.name || '未知'}<br>
+                        <strong>类型:</strong> ${chartText}<br>
+                        <strong>原因:</strong> ${response.reason || '未知'}
+                    `;
+                    log(`URL支持测试: ${JSON.stringify(response, null, 2)}`, 'info');
+                } else {
+                    statusDiv.innerHTML = `<span class="error">❌ 测试失败: ${response?.error || '未知错误'}</span>`;
+                    log(`URL支持测试失败: ${response?.error || '未知错误'}`, 'error');
+                }
+            });
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('测试页面加载完成', 'info');
+            checkExtensionInfo();
+
+            // 自动测试内容脚本
+            setTimeout(() => {
+                testContentScript();
+            }, 1000);
+        });
+
+        // 监听来自扩展的消息
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            log(`收到扩展消息: ${JSON.stringify(message)}`, 'info');
+            return false;
+        });
+
+        // 监听来自页面的消息（postMessage）
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type && event.data.type.includes('candlebot')) {
+                log(`收到页面消息: ${JSON.stringify(event.data)}`, 'info');
+            }
+        });
+    </script>
+</body>
+</html>

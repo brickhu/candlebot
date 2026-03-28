@@ -10,11 +10,11 @@ const TestProxyPage = () => {
     setTestResult('')
 
     try {
-      // 测试0: 检查token状态
-      setTestResult(prev => prev + '=== 测试0: 检查认证状态 ===\n')
+      // Test 0: Check token status
+      setTestResult(prev => prev + '=== Test 0: Check authentication status ===\n')
       const token = localStorage.getItem('auth_token')
-      setTestResult(prev => prev + `localStorage auth_token: ${token ? `存在 (${token.substring(0, 30)}...)` : '不存在'}\n`)
-      setTestResult(prev => prev + `api.token: ${api.token ? `存在 (${api.token.substring(0, 30)}...)` : '不存在'}\n`)
+      setTestResult(prev => prev + `localStorage auth_token: ${token ? `Exists (${token.substring(0, 30)}...)` : '不Exists'}\n`)
+      setTestResult(prev => prev + `api.token: ${api.token ? `Exists (${api.token.substring(0, 30)}...)` : '不Exists'}\n`)
       setTestResult(prev => prev + `api.isAuthenticated(): ${api.isAuthenticated() ? '是' : '否'}\n`)
 
       // 测试1: 检查API基础连接
@@ -125,7 +125,7 @@ const TestProxyPage = () => {
           <a href="/dashboard" class="text-primary hover:text-primary-dark mr-4">
             前往仪表板
           </a>
-          <a href="/login" class="text-primary hover:text-primary-dark">
+          <a href={`/login?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark">
             前往登录页
           </a>
         </div>

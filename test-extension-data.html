@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试扩展数据传递</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 20px;
+            background: #f5f5f7;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>测试浏览器扩展数据传递</h1>
+
+        <div class="section">
+            <h2>1. 检查当前状态</h2>
+            <div id="status1" class="status info">正在检查...</div>
+            <button onclick="checkStatus()">刷新状态</button>
+        </div>
+
+        <div class="section">
+            <h2>2. 模拟扩展数据注入</h2>
+            <p>点击按钮模拟扩展注入数据到sessionStorage：</p>
+            <button onclick="simulateExtensionData()">模拟扩展数据注入</button>
+            <div id="status2" class="status"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. 检查数据接收</h2>
+            <p>检查是否成功接收到数据：</p>
+            <button onclick="checkData()">检查接收的数据</button>
+            <div id="status3" class="status"></div>
+            <pre id="dataOutput"></pre>
+        </div>
+
+        <div class="section">
+            <h2>4. 测试跳转到 /new 页面</h2>
+            <p>测试从扩展跳转到分析页面：</p>
+            <button onclick="testRedirect()">测试跳转到 /new</button>
+            <div id="status4" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        // 检查当前状态
+        function checkStatus() {
+            const status1 = document.getElementById('status1')
+            const url = new URL(window.location)
+            const hasFromExtension = url.searchParams.has('from_extension')
+            const hasImageData = sessionStorage.getItem('candlebot_extension_image')
+
+            status1.innerHTML = `
+                <div>当前URL: ${window.location.href}</div>
+                <div>URL参数 from_extension: ${hasFromExtension ? '✅ 存在' : '❌ 不存在'}</div>
+                <div>sessionStorage candlebot_extension_image: ${hasImageData ? `✅ 存在 (${hasImageData.length} 字符)` : '❌ 不存在'}</div>
+            `
+        }
+
+        // 模拟扩展数据注入
+        function simulateExtensionData() {
+            const status2 = document.getElementById('status2')
+            try {
+                // 创建模拟的base64图片数据（简化的）
+                const mockImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+                const base64Only = mockImageData.replace(/^data:image\/png;base64,/, '')
+
+                // 注入到sessionStorage
+                sessionStorage.setItem('candlebot_extension_image', base64Only)
+
+                // 设置URL参数
+                const url = new URL(window.location)
+                url.searchParams.set('from_extension', 'true')
+                window.history.replaceState({}, '', url.toString())
+
+                status2.innerHTML = `<div class="success">✅ 模拟数据注入成功！</div>
+                <div>数据长度: ${base64Only.length} 字符</div>
+                <div>URL已更新: ${window.location.href}</div>`
+
+                // 触发事件
+                window.dispatchEvent(new CustomEvent('candlebot_extension_data_ready', {
+                    detail: { dataLength: base64Only.length }
+                }))
+
+            } catch (error) {
+                status2.innerHTML = `<div class="error">❌ 模拟失败: ${error.message}</div>`
+            }
+        }
+
+        // 检查数据接收
+        function checkData() {
+            const status3 = document.getElementById('status3')
+            const dataOutput = document.getElementById('dataOutput')
+
+            const imageData = sessionStorage.getItem('candlebot_extension_image')
+            const url = new URL(window.location)
+            const fromExtension = url.searchParams.get('from_extension')
+
+            if (imageData && fromExtension === 'true') {
+                status3.innerHTML = `<div class="success">✅ 成功接收到扩展数据！</div>
+                <div>数据长度: ${imageData.length} 字符</div>
+                <div>前100字符: ${imageData.substring(0, 100)}...</div>`
+
+                dataOutput.textContent = JSON.stringify({
+                    fromExtension: fromExtension,
+                    hasImageData: true,
+                    dataLength: imageData.length,
+                    dataPreview: imageData.substring(0, 200) + '...'
+                }, null, 2)
+            } else {
+                status3.innerHTML = `<div class="error">❌ 未找到扩展数据</div>
+                <div>from_extension: ${fromExtension || 'null'}</div>
+                <div>imageData: ${imageData ? '存在' : '不存在'}</div>`
+
+                dataOutput.textContent = JSON.stringify({
+                    fromExtension: fromExtension,
+                    hasImageData: !!imageData,
+                    sessionStorageKeys: Object.keys(sessionStorage)
+                }, null, 2)
+            }
+        }
+
+        // 测试跳转到 /new 页面
+        function testRedirect() {
+            const status4 = document.getElementById('status4')
+
+            // 先确保有数据
+            const imageData = sessionStorage.getItem('candlebot_extension_image')
+            if (!imageData) {
+                status4.innerHTML = `<div class="error">❌ 请先注入数据再测试跳转</div>`
+                return
+            }
+
+            // 跳转到 /new 页面
+            const url = new URL('/new', window.location.origin)
+            url.searchParams.set('from_extension', 'true')
+
+            status4.innerHTML = `<div class="info">正在跳转到: ${url.toString()}</div>`
+
+            setTimeout(() => {
+                window.location.href = url.toString()
+            }, 1000)
+        }
+
+        // 监听扩展数据就绪事件
+        window.addEventListener('candlebot_extension_data_ready', (event) => {
+            console.log('收到扩展数据就绪事件:', event.detail)
+            const status1 = document.getElementById('status1')
+            status1.innerHTML += `<div class="success">📢 收到扩展数据就绪事件！数据长度: ${event.detail.dataLength}</div>`
+        })
+
+        // 页面加载时检查状态
+        window.addEventListener('DOMContentLoaded', () => {
+            checkStatus()
+        })
+    </script>
+</body>
+</html>

@@ -105,6 +105,23 @@ async def get_current_active_user(
     return current_user
 
 
+async def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[models.User]:
+    """获取当前用户（可选）
+
+    如果没有提供token或token无效，返回None
+    """
+    if not token:
+        return None
+
+    try:
+        return await get_current_user(token, db)
+    except HTTPException:
+        return None
+
+
 def check_user_quota(user: models.User) -> tuple[bool, int]:
     """检查用户配额
     返回：(是否允许, 剩余次数)

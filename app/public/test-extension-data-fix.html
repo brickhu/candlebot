@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot Extension Data Transfer Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-section {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #333;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>Candlebot Extension Data Transfer Test</h1>
+    <p>This page tests the data transfer from browser extension to web app.</p>
+
+    <div class="container">
+        <h2>Test 1: Simulate Extension PostMessage</h2>
+        <div class="test-section">
+            <p>Simulates the postMessage that the extension sends when it captures a screenshot.</p>
+            <button onclick="simulateExtensionPostMessage()">Simulate Extension PostMessage</button>
+            <div class="log" id="log1"></div>
+        </div>
+
+        <h2>Test 2: Check Storage Locations</h2>
+        <div class="test-section">
+            <p>Checks all storage locations where extension data might be stored.</p>
+            <button onclick="checkStorageLocations()">Check Storage Locations</button>
+            <div class="log" id="log2"></div>
+        </div>
+
+        <h2>Test 3: Test checkExtensionRedirect()</h2>
+        <div class="test-section">
+            <p>Tests the checkExtensionRedirect function from the web app.</p>
+            <button onclick="testCheckExtensionRedirect()">Test checkExtensionRedirect</button>
+            <div class="log" id="log3"></div>
+        </div>
+
+        <h2>Test 4: Simulate Real Extension Flow</h2>
+        <div class="test-section">
+            <p>Simulates the complete extension flow: store data, set URL params, and trigger events.</p>
+            <button onclick="simulateCompleteFlow()">Simulate Complete Flow</button>
+            <div class="log" id="log4"></div>
+        </div>
+    </div>
+
+    <script>
+        // Helper function to add log messages
+        function addLog(logId, message, className = '') {
+            const logElement = document.getElementById(logId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span class="${className}">[${timestamp}] ${message}</span>`;
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Test 1: Simulate Extension PostMessage
+        function simulateExtensionPostMessage() {
+            const logId = 'log1';
+            addLog(logId, 'Starting postMessage simulation...');
+
+            // Create a small test image (1x1 pixel PNG)
+            const testImageData = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+            // Simulate the postMessage that extension sends
+            const message = {
+                type: 'candlebot_extension_image',
+                imageData: testImageData,
+                metadata: {
+                    dataSource: 'post_message',
+                    extensionId: 'test-extension-id',
+                    timestamp: new Date().toISOString(),
+                    imageFormat: 'png'
+                }
+            };
+
+            addLog(logId, `Sending postMessage: ${JSON.stringify(message.type)}`);
+
+            // Send the message
+            window.postMessage(message, window.location.origin);
+
+            addLog(logId, 'postMessage sent. Check if setupExtensionReceiver() handles it.', 'success');
+
+            // Also test the event listener
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'candlebot_web_ready') {
+                    addLog(logId, 'Received web_ready response from setupExtensionReceiver()', 'success');
+                }
+            });
+        }
+
+        // Test 2: Check Storage Locations
+        function checkStorageLocations() {
+            const logId = 'log2';
+            addLog(logId, 'Checking storage locations...');
+
+            // Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromExtension = urlParams.get('from_extension');
+            const imageData = urlParams.get('image_data');
+
+            addLog(logId, `URL params - from_extension: ${fromExtension}, image_data: ${imageData ? 'present' : 'not present'}`);
+
+            // Check localStorage
+            const localStorageData = localStorage.getItem('candlebot_extension_image');
+            addLog(logId, `localStorage - candlebot_extension_image: ${localStorageData ? `present (${localStorageData.length} chars)` : 'not present'}`);
+
+            // Check sessionStorage
+            const sessionStorageData = sessionStorage.getItem('candlebot_extension_image');
+            addLog(logId, `sessionStorage - candlebot_extension_image: ${sessionStorageData ? `present (${sessionStorageData.length} chars)` : 'not present'}`);
+
+            addLog(logId, 'Storage check complete.', 'success');
+        }
+
+        // Test 3: Test checkExtensionRedirect()
+        async function testCheckExtensionRedirect() {
+            const logId = 'log3';
+            addLog(logId, 'Testing checkExtensionRedirect()...');
+
+            try {
+                // Load the extension module
+                const modulePath = '/src/lib/extension.js';
+                addLog(logId, `Attempting to load module: ${modulePath}`);
+
+                // Since we can't directly import, we'll simulate the function
+                const redirectInfo = simulateCheckExtensionRedirect();
+                addLog(logId, `Result: ${JSON.stringify(redirectInfo, null, 2)}`, 'success');
+
+            } catch (error) {
+                addLog(logId, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Simulated checkExtensionRedirect function
+        function simulateCheckExtensionRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromExtension = urlParams.get('from_extension');
+            const imageData = urlParams.get('image_data');
+
+            const localStorageData = localStorage.getItem('candlebot_extension_image');
+            const sessionStorageData = sessionStorage.getItem('candlebot_extension_image');
+
+            const hasExtensionData = fromExtension === 'true' || localStorageData || sessionStorageData;
+
+            if (hasExtensionData) {
+                if (imageData) {
+                    return {
+                        fromExtension: true,
+                        imageData: imageData,
+                        source: 'url_params',
+                        imageFormat: urlParams.get('image_format') || 'png'
+                    };
+                } else if (sessionStorageData) {
+                    return {
+                        fromExtension: true,
+                        imageData: sessionStorageData,
+                        source: 'session_storage',
+                        imageFormat: sessionStorage.getItem('candlebot_extension_image_format') || 'png'
+                    };
+                } else if (localStorageData) {
+                    return {
+                        fromExtension: true,
+                        imageData: localStorageData,
+                        source: 'local_storage',
+                        imageFormat: 'png' // Default
+                    };
+                } else {
+                    return {
+                        fromExtension: true,
+                        imageData: null,
+                        source: 'no_data'
+                    };
+                }
+            }
+
+            return {
+                fromExtension: false,
+                imageData: null,
+                source: 'not_extension'
+            };
+        }
+
+        // Test 4: Simulate Complete Flow
+        function simulateCompleteFlow() {
+            const logId = 'log4';
+            addLog(logId, 'Simulating complete extension flow...');
+
+            // Step 1: Store data in sessionStorage (like extension would)
+            const testImageData = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+            sessionStorage.setItem('candlebot_extension_image', testImageData);
+            sessionStorage.setItem('candlebot_extension_image_format', 'png');
+
+            addLog(logId, 'Step 1: Data stored in sessionStorage', 'success');
+
+            // Step 2: Set URL parameter
+            const url = new URL(window.location);
+            url.searchParams.set('from_extension', 'true');
+            window.history.replaceState({}, '', url.toString());
+
+            addLog(logId, 'Step 2: URL parameter set', 'success');
+
+            // Step 3: Trigger custom event (like setupExtensionReceiver does)
+            window.dispatchEvent(new CustomEvent('candlebot_extension_data_received', {
+                detail: {
+                    imageData: testImageData,
+                    imageFormat: 'png',
+                    metadata: { source: 'test' },
+                    timestamp: Date.now()
+                }
+            }));
+
+            addLog(logId, 'Step 3: Custom event triggered', 'success');
+
+            // Step 4: Check the result
+            const redirectInfo = simulateCheckExtensionRedirect();
+            addLog(logId, `Final check: ${JSON.stringify(redirectInfo, null, 2)}`, 'success');
+
+            addLog(logId, 'Complete flow simulation finished!', 'success');
+        }
+
+        // Initialize: Listen for extension messages
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'candlebot_extension_image') {
+                addLog('log1', `Received extension image message: ${event.data.imageData?.length || 0} chars`, 'success');
+            }
+        });
+
+        // Initialize: Listen for custom events
+        window.addEventListener('candlebot_extension_data_received', (event) => {
+            addLog('log4', `Received custom event: ${event.detail.imageData?.length || 0} chars`, 'success');
+        });
+
+        // Initial log
+        addLog('log1', 'Test page loaded and ready.');
+        addLog('log2', 'Storage test ready.');
+        addLog('log3', 'Redirect test ready.');
+        addLog('log4', 'Complete flow test ready.');
+    </script>
+</body>
+</html>

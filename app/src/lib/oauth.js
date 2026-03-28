@@ -67,11 +67,17 @@ export function extractOAuthCodeFromUrl() {
 // 设置当前OAuth provider
 export function setOAuthProvider(provider) {
   localStorage.setItem('oauth_provider', provider)
+
+  // 保存当前页面的完整URL，用于OAuth登录成功后重定向
+  const currentUrl = window.location.href
+  localStorage.setItem('oauth_redirect_url', currentUrl)
+  console.log('保存OAuth重定向URL:', currentUrl)
 }
 
 // 清除OAuth provider
 export function clearOAuthProvider() {
   localStorage.removeItem('oauth_provider')
+  localStorage.removeItem('oauth_redirect_url')
 }
 
 // 获取重定向URI（根据当前环境）

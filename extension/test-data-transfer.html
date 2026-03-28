@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot扩展数据传递测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-section h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .step:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .result {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .result:before {
+            content: "结果: ";
+            font-weight: bold;
+            color: #059669;
+        }
+        .error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .error:before {
+            content: "错误: ";
+            font-weight: bold;
+            color: #dc2626;
+        }
+        .note {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .note:before {
+            content: "注意: ";
+            font-weight: bold;
+            color: #d97706;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        button.secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        button.secondary:hover {
+            background: #cbd5e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Candlebot扩展数据传递测试</h1>
+
+    <div class="note">
+        此页面用于测试扩展与web app之间的数据传递。请确保web app运行在 <code>http://localhost:5173</code>。
+    </div>
+
+    <div class="test-section">
+        <h3>测试1: 模拟扩展数据传递</h3>
+
+        <div class="step">点击下方按钮模拟扩展传递图片数据到web app</div>
+        <div class="step">数据将通过URL参数传递到 <code>/new</code> 页面</div>
+
+        <button onclick="testUrlParams()">测试URL参数传递</button>
+        <button onclick="testSessionStorage()" class="secondary">测试sessionStorage传递</button>
+
+        <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试2: 检查数据接收</h3>
+
+        <div class="step">打开浏览器开发者工具（F12）</div>
+        <div class="step">查看Console标签页的日志输出</div>
+        <div class="step">检查以下函数是否正常工作：</div>
+
+        <div class="code-block">
+// 在web app控制台检查
+checkExtensionRedirect()
+// 应该返回类似：
+// {
+//   fromExtension: true,
+//   imageData: "iVBORw0KGgoAAAANSUhEUg...",
+//   source: "url_params"
+// }
+        </div>
+
+        <button onclick="checkCurrentData()">检查当前页面数据</button>
+
+        <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试3: 完整流程测试</h3>
+
+        <div class="step">1. 安装并加载Candlebot扩展</div>
+        <div class="step">2. 访问TradingView或aggr.trade图表页面</div>
+        <div class="step">3. 点击扩展图标进行自动截图</div>
+        <div class="step">4. 在弹窗中查看截图预览</div>
+        <div class="step">5. 点击"立即分析"按钮</div>
+        <div class="step">6. 验证新标签页是否正确加载截图</div>
+
+        <div class="note">
+            验证点：
+            <ul>
+                <li>扩展图标点击后是否自动截图</li>
+                <li>弹窗是否显示截图预览</li>
+                <li>"立即分析"按钮是否跳转到分析页面</li>
+                <li>分析页面是否自动加载截图</li>
+                <li>分析弹窗是否显示扩展来源的图片</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>调试信息</h3>
+
+        <div class="code-block" id="debug-info">
+点击上方测试按钮查看调试信息...
+        </div>
+
+        <button onclick="clearDebug()" class="secondary">清除调试信息</button>
+    </div>
+
+    <script>
+        function logDebug(message) {
+            const debugEl = document.getElementById('debug-info');
+            const timestamp = new Date().toLocaleTimeString();
+            debugEl.innerHTML = `[${timestamp}] ${message}\n` + debugEl.innerHTML;
+        }
+
+        function clearDebug() {
+            document.getElementById('debug-info').innerHTML = '调试信息已清除';
+        }
+
+        // 创建一个简单的测试图片（1x1像素的红色PNG）
+        function createTestImageData() {
+            // 1x1像素红色PNG的base64编码
+            return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        }
+
+        function testUrlParams() {
+            const testData = createTestImageData();
+            const baseUrl = 'http://localhost:5173/new';
+            const url = new URL(baseUrl);
+
+            url.searchParams.set('from_extension', 'true');
+            url.searchParams.set('image_data', testData);
+            url.searchParams.set('site', 'test_site');
+            url.searchParams.set('symbol', 'TEST/USDT');
+
+            logDebug(`创建测试URL: ${url.toString().substring(0, 100)}...`);
+
+            // 在新标签页打开
+            window.open(url.toString(), '_blank');
+
+            document.getElementById('test1-result').innerHTML =
+                '<div class="result">已打开测试页面，请检查是否自动加载测试图片</div>';
+        }
+
+        function testSessionStorage() {
+            const testData = createTestImageData();
+
+            // 模拟扩展存储数据
+            sessionStorage.setItem('candlebot_extension_image', `data:image/png;base64,${testData}`);
+
+            const baseUrl = 'http://localhost:5173/new';
+            const url = new URL(baseUrl);
+            url.searchParams.set('from_extension', 'true');
+
+            logDebug(`设置sessionStorage数据，长度: ${testData.length}`);
+            logDebug(`打开URL: ${url.toString()}`);
+
+            // 在新标签页打开
+            window.open(url.toString(), '_blank');
+
+            document.getElementById('test1-result').innerHTML =
+                '<div class="result">已设置sessionStorage并打开页面，请检查是否从sessionStorage加载图片</div>';
+        }
+
+        function checkCurrentData() {
+            try {
+                // 检查URL参数
+                const urlParams = new URLSearchParams(window.location.search);
+                const fromExtension = urlParams.get('from_extension');
+                const imageData = urlParams.get('image_data');
+
+                let result = '<div class="result">';
+                result += `<p>当前页面URL参数:</p>`;
+                result += `<p>from_extension: ${fromExtension || '无'}</p>`;
+                result += `<p>image_data: ${imageData ? `有 (${imageData.length} 字符)` : '无'}</p>`;
+
+                // 检查storage
+                const sessionData = sessionStorage.getItem('candlebot_extension_image');
+                const localData = localStorage.getItem('candlebot_extension_image');
+
+                result += `<p>sessionStorage数据: ${sessionData ? `有 (${sessionData.length} 字符)` : '无'}</p>`;
+                result += `<p>localStorage数据: ${localData ? `有 (${localData.length} 字符)` : '无'}</p>`;
+                result += '</div>';
+
+                document.getElementById('test2-result').innerHTML = result;
+
+                logDebug(`检查完成: from_extension=${fromExtension}, image_data=${imageData ? '有' : '无'}`);
+
+            } catch (error) {
+                document.getElementById('test2-result').innerHTML =
+                    `<div class="error">检查失败: ${error.message}</div>`;
+                logDebug(`检查失败: ${error.message}`);
+            }
+        }
+
+        // 页面加载时显示当前URL信息
+        window.addEventListener('load', () => {
+            const url = window.location.href;
+            logDebug(`当前页面: ${url}`);
+
+            if (url.includes('localhost:5173')) {
+                logDebug('检测到web app页面，可以运行测试');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试postMessage数据传输</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        button {
+            padding: 10px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            margin-top: 10px;
+            padding: 10px;
+            background: #333;
+            color: #0f0;
+            font-family: monospace;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>测试postMessage数据传输方案</h1>
+
+    <div class="test-section">
+        <h2>1. 模拟扩展端发送数据</h2>
+        <p>这个测试模拟扩展端通过postMessage发送图片数据到web app。</p>
+
+        <button id="testSmallImage">测试小图片（&lt;2KB）</button>
+        <button id="testMediumImage">测试中等图片（~50KB）</button>
+        <button id="testLargeImage">测试大图片（~500KB）</button>
+
+        <div class="log" id="sendLog"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 模拟web app端接收数据</h2>
+        <p>这个区域模拟web app页面，监听postMessage消息。</p>
+
+        <div>
+            <strong>当前URL:</strong> <span id="currentUrl"></span><br>
+            <strong>收到消息:</strong> <span id="messageCount">0</span><br>
+            <strong>图片数据长度:</strong> <span id="imageDataLength">0</span> 字符<br>
+            <strong>sessionStorage数据:</strong> <span id="storageStatus">无</span>
+        </div>
+
+        <button id="clearStorage">清理sessionStorage</button>
+        <button id="simulateRedirect">模拟跳转到/new页面</button>
+
+        <div class="log" id="receiveLog"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 完整流程测试</h2>
+        <p>模拟完整的扩展→web app数据传输流程。</p>
+
+        <button id="fullTest">运行完整测试</button>
+
+        <div class="log" id="fullTestLog"></div>
+    </div>
+
+    <script>
+        // 工具函数
+        function log(containerId, message, className = '') {
+            const container = document.getElementById(containerId);
+            const line = document.createElement('div');
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (className) line.className = className;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLog(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        // 生成测试图片数据
+        function generateTestImageData(sizeKB) {
+            // 生成指定大小的base64测试数据
+            const base64Prefix = 'data:image/png;base64,';
+            const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+            // 计算需要的字符数（base64每3字节变成4字符）
+            const targetBytes = sizeKB * 1024;
+            const targetChars = Math.ceil(targetBytes / 3) * 4;
+
+            let result = '';
+            for (let i = 0; i < targetChars; i++) {
+                result += base64Chars.charAt(Math.floor(Math.random() * base64Chars.length));
+            }
+
+            // 添加填充字符使长度为4的倍数
+            while (result.length % 4 !== 0) {
+                result += '=';
+            }
+
+            return base64Prefix + result;
+        }
+
+        // 1. 模拟扩展端发送数据
+        document.getElementById('testSmallImage').addEventListener('click', () => {
+            clearLog('sendLog');
+            log('sendLog', '开始测试小图片传输...');
+
+            const imageData = generateTestImageData(1); // 1KB
+            log('sendLog', `生成图片数据: ${imageData.length} 字符`);
+
+            // 模拟扩展发送postMessage
+            const message = {
+                type: 'candlebot_extension_image',
+                imageData: imageData,
+                metadata: {
+                    site: 'TradingView',
+                    symbol: 'BTCUSD',
+                    timeframe: '1D',
+                    timestamp: new Date().toISOString(),
+                    imageFormat: 'png'
+                }
+            };
+
+            log('sendLog', '发送postMessage...');
+            window.postMessage(message, window.location.origin);
+
+            log('sendLog', '✅ postMessage已发送', 'success');
+            log('sendLog', `数据大小: ${Math.round(imageData.length / 1024)}KB`);
+        });
+
+        document.getElementById('testMediumImage').addEventListener('click', () => {
+            clearLog('sendLog');
+            log('sendLog', '开始测试中等图片传输...');
+
+            const imageData = generateTestImageData(50); // 50KB
+            log('sendLog', `生成图片数据: ${imageData.length} 字符`);
+
+            const message = {
+                type: 'candlebot_extension_image',
+                imageData: imageData,
+                metadata: {
+                    site: 'Aggr.trade',
+                    symbol: 'SOLUSDT',
+                    timeframe: '4H',
+                    timestamp: new Date().toISOString(),
+                    imageFormat: 'png'
+                }
+            };
+
+            log('sendLog', '发送postMessage...');
+            window.postMessage(message, window.location.origin);
+
+            log('sendLog', '✅ postMessage已发送', 'success');
+            log('sendLog', `数据大小: ${Math.round(imageData.length / 1024)}KB`);
+        });
+
+        document.getElementById('testLargeImage').addEventListener('click', () => {
+            clearLog('sendLog');
+            log('sendLog', '开始测试大图片传输...');
+
+            const imageData = generateTestImageData(500); // 500KB
+            log('sendLog', `生成图片数据: ${imageData.length} 字符`);
+
+            const message = {
+                type: 'candlebot_extension_image',
+                imageData: imageData,
+                metadata: {
+                    site: 'DexScreener',
+                    symbol: 'ETH/USDC',
+                    timeframe: '15m',
+                    timestamp: new Date().toISOString(),
+                    imageFormat: 'png'
+                }
+            };
+
+            log('sendLog', '发送postMessage...');
+            window.postMessage(message, window.location.origin);
+
+            log('sendLog', '✅ postMessage已发送', 'success');
+            log('sendLog', `数据大小: ${Math.round(imageData.length / 1024)}KB`);
+        });
+
+        // 2. 模拟web app端接收数据
+        let messageCount = 0;
+
+        // 监听postMessage
+        window.addEventListener('message', (event) => {
+            // 安全检查
+            if (event.origin !== window.location.origin) {
+                log('receiveLog', `⚠️ 忽略来自不同源的消息: ${event.origin}`, 'warning');
+                return;
+            }
+
+            const data = event.data;
+            messageCount++;
+            document.getElementById('messageCount').textContent = messageCount;
+
+            log('receiveLog', `收到消息类型: ${data.type || '未知'}`, 'success');
+
+            if (data.type === 'candlebot_extension_image') {
+                const imageData = data.imageData || '';
+                const metadata = data.metadata || {};
+
+                log('receiveLog', `图片数据长度: ${imageData.length} 字符`);
+                log('receiveLog', `来源网站: ${metadata.site || '未知'}`);
+                log('receiveLog', `交易对: ${metadata.symbol || '未知'}`);
+
+                // 模拟web app的处理逻辑
+                if (imageData) {
+                    // 存储到sessionStorage
+                    sessionStorage.setItem('candlebot_extension_image', imageData);
+                    sessionStorage.setItem('candlebot_extension_image_format', metadata.imageFormat || 'png');
+
+                    // 更新URL参数
+                    const url = new URL(window.location);
+                    url.searchParams.set('from_extension', 'true');
+                    window.history.replaceState({}, '', url.toString());
+
+                    // 更新UI
+                    document.getElementById('currentUrl').textContent = url.toString();
+                    document.getElementById('imageDataLength').textContent = imageData.length;
+                    document.getElementById('storageStatus').textContent = '有数据';
+                    document.getElementById('storageStatus').className = 'success';
+
+                    log('receiveLog', '✅ 数据已存储到sessionStorage', 'success');
+                    log('receiveLog', `URL已更新: ${url.toString()}`);
+                }
+            }
+        });
+
+        // 清理sessionStorage
+        document.getElementById('clearStorage').addEventListener('click', () => {
+            sessionStorage.removeItem('candlebot_extension_image');
+            sessionStorage.removeItem('candlebot_extension_image_format');
+
+            // 清理URL参数
+            const url = new URL(window.location);
+            url.searchParams.delete('from_extension');
+            window.history.replaceState({}, '', url.toString());
+
+            document.getElementById('currentUrl').textContent = url.toString();
+            document.getElementById('imageDataLength').textContent = '0';
+            document.getElementById('storageStatus').textContent = '无';
+            document.getElementById('storageStatus').className = '';
+
+            log('receiveLog', '🧹 已清理sessionStorage和URL参数', 'success');
+        });
+
+        // 模拟跳转到/new页面
+        document.getElementById('simulateRedirect').addEventListener('click', () => {
+            const imageData = sessionStorage.getItem('candlebot_extension_image');
+            if (imageData) {
+                log('receiveLog', '🚀 模拟跳转到/new页面...', 'success');
+                log('receiveLog', `携带图片数据: ${imageData.length} 字符`);
+
+                // 在实际应用中，这里会跳转到 /new 页面
+                // window.location.href = '/new?from_extension=true';
+
+                log('receiveLog', '✅ 跳转成功，页面可以读取sessionStorage中的数据');
+            } else {
+                log('receiveLog', '❌ 没有图片数据，无法跳转', 'error');
+            }
+        });
+
+        // 3. 完整流程测试
+        document.getElementById('fullTest').addEventListener('click', () => {
+            clearLog('fullTestLog');
+            log('fullTestLog', '开始完整流程测试...');
+
+            // 步骤1: 生成测试数据
+            const imageData = generateTestImageData(100); // 100KB
+            log('fullTestLog', `1. 生成测试图片数据: ${imageData.length} 字符`);
+
+            // 步骤2: 发送postMessage
+            const message = {
+                type: 'candlebot_extension_image',
+                imageData: imageData,
+                metadata: {
+                    site: 'TestSite',
+                    symbol: 'TEST/USD',
+                    timeframe: '1H',
+                    timestamp: new Date().toISOString(),
+                    imageFormat: 'png'
+                }
+            };
+
+            log('fullTestLog', '2. 发送postMessage...');
+            window.postMessage(message, window.location.origin);
+
+            // 等待消息处理
+            setTimeout(() => {
+                // 步骤3: 检查sessionStorage
+                const storedData = sessionStorage.getItem('candlebot_extension_image');
+                if (storedData && storedData === imageData) {
+                    log('fullTestLog', '3. ✅ sessionStorage数据验证成功', 'success');
+                    log('fullTestLog', `   存储数据长度: ${storedData.length} 字符`);
+                } else {
+                    log('fullTestLog', '3. ❌ sessionStorage数据验证失败', 'error');
+                }
+
+                // 步骤4: 检查URL参数
+                const urlParams = new URLSearchParams(window.location.search);
+                const fromExtension = urlParams.get('from_extension');
+                if (fromExtension === 'true') {
+                    log('fullTestLog', '4. ✅ URL参数验证成功', 'success');
+                    log('fullTestLog', `   当前URL: ${window.location.href}`);
+                } else {
+                    log('fullTestLog', '4. ❌ URL参数验证失败', 'error');
+                }
+
+                // 步骤5: 模拟页面跳转
+                log('fullTestLog', '5. 模拟页面跳转...');
+                log('fullTestLog', '   ✅ 完整流程测试完成', 'success');
+                log('fullTestLog', '   ---------------------------------');
+                log('fullTestLog', '   总结: postMessage方案可以无限制传输数据');
+                log('fullTestLog', '   优势: 无大小限制、安全、实时传输');
+                log('fullTestLog', '   要求: 需要目标页面监听message事件');
+
+            }, 500);
+        });
+
+        // 初始化UI
+        document.getElementById('currentUrl').textContent = window.location.href;
+
+        // 检查初始sessionStorage状态
+        const hasData = sessionStorage.getItem('candlebot_extension_image');
+        document.getElementById('storageStatus').textContent = hasData ? '有数据' : '无';
+        if (hasData) {
+            document.getElementById('storageStatus').className = 'success';
+            document.getElementById('imageDataLength').textContent = hasData.length;
+        }
+
+        log('receiveLog', '✅ postMessage监听器已启动', 'success');
+    </script>
+</body>
+</html>

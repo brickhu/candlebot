@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
 
 const UserTestPage = () => {
@@ -101,7 +101,7 @@ const UserTestPage = () => {
           <a href="/dashboard" class="text-primary hover:text-primary-dark mr-4">
             前往仪表板
           </a>
-          <a href="/login" class="text-primary hover:text-primary-dark">
+          <a href={`/login?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark">
             前往登录页
           </a>
         </div>

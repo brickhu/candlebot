@@ -1,7 +1,8 @@
 import { createSignal } from 'solid-js'
 import { useNavigate, A } from '@solidjs/router'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
+import { redirectAfterAuth } from '../lib/redirect'
 
 const RegisterPage = () => {
   console.log('🔧 RegisterPage组件开始渲染')
@@ -46,7 +47,8 @@ const RegisterPage = () => {
     try {
       const success = await auth.register(email(), username(), password())
       if (success) {
-        navigate('/dashboard')
+        console.log('注册成功，执行重定向')
+        redirectAfterAuth(navigate)
       } else {
         setError('Registration failed. Please try again.')
       }
@@ -238,7 +240,7 @@ const RegisterPage = () => {
 
           <div class="mt-8 text-center text-sm text-muted">
             Already have an account?{' '}
-            <A href="/login" class="text-primary hover:text-primary-dark font-medium">
+            <A href={`/login?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark font-medium">
               Sign in
             </A>
           </div>
