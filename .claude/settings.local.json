@@ -78,7 +78,8 @@
       "Bash(source venv/bin/activate && python3 add_visibility_field.py)",
       "Bash(source venv/bin/activate && python3 simple_migration.py)",
       "Bash(ls -la *.db)",
-      "Bash(source venv/bin/activate && python3 check_db.py)"
+      "Bash(source venv/bin/activate && python3 check_db.py)",
+      "Bash(source venv/bin/activate && python3 migrate_postgres.py)"
     ]
   }
 }

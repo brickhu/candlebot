@@ -462,7 +462,7 @@ async def analyze(
                 "lang": req.lang
             },
             analysis_metadata=meta,
-            visibility=req.visibility  # 设置可见性
+            visibility=getattr(req, 'visibility', 'private')  # 设置可见性，默认为private
         )
         db.add(db_record)
         db.commit()

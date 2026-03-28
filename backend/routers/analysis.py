@@ -90,7 +90,9 @@ async def get_analysis_record(
         )
 
     # 如果是公开记录，任何人都可以访问
-    if record.visibility == "public":
+    # 注意：如果数据库中没有visibility字段，默认为private
+    visibility = getattr(record, 'visibility', 'private')
+    if visibility == "public":
         # 返回公开信息（不包含report_data）
         return schemas.AnalysisRecordPublic(
             id=record.id,
@@ -98,7 +100,7 @@ async def get_analysis_record(
             platform=record.platform,
             image_hash=record.image_hash,
             analysis_metadata=record.analysis_metadata,
-            visibility=record.visibility,
+            visibility=getattr(record, 'visibility', 'private'),
             created_at=record.created_at,
             has_image=bool(record.image_data)
         )
@@ -207,8 +209,16 @@ async def update_analysis_visibility(
         )
 
     # 更新可见性
-    record.visibility = visibility
-    db.commit()
+    # 检查字段是否存在
+    if hasattr(record, 'visibility'):
+        record.visibility = visibility
+        db.commit()
+    else:
+        # 如果字段不存在，返回错误
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="数据库缺少visibility字段，请先执行数据库迁移"
+        )
 
     return schemas.SuccessResponse(message=f"记录可见性已更新为'{visibility}'")
 
