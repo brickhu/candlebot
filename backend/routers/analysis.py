@@ -42,20 +42,66 @@ async def get_analysis_history(
     if pair:
         query = query.filter(models.AnalysisRecord.analysis_metadata["pair"].astext == pair)
 
-    # 计算总数
-    total = query.count()
+    # 计算总数 - 使用原始SQL避免字段不存在的问题
+    total = db.execute(
+        "SELECT COUNT(*) FROM analysis_records WHERE user_id = :user_id",
+        {"user_id": current_user.id}
+    ).scalar()
 
-    # 应用分页和排序
-    items = query.order_by(desc(models.AnalysisRecord.created_at)) \
-        .offset((page - 1) * per_page) \
-        .limit(per_page) \
-        .all()
+    # 应用分页和排序 - 使用原始SQL避免字段不存在的问题
+    sql = """
+        SELECT id, user_id, platform, image_hash, image_data,
+               report_data, analysis_metadata, created_at
+        FROM analysis_records
+        WHERE user_id = :user_id
+        {platform_filter}
+        {pair_filter}
+        ORDER BY created_at DESC
+        LIMIT :limit OFFSET :offset
+    """
+
+    # 构建参数
+    params = {
+        "user_id": current_user.id,
+        "limit": per_page,
+        "offset": (page - 1) * per_page
+    }
+
+    # 添加平台筛选
+    platform_filter = ""
+    if platform:
+        platform_filter = "AND platform = :platform"
+        params["platform"] = platform
+
+    # 添加交易对筛选
+    pair_filter = ""
+    if pair:
+        pair_filter = "AND analysis_metadata->>'pair' = :pair"
+        params["pair"] = pair
+
+    sql = sql.format(platform_filter=platform_filter, pair_filter=pair_filter)
+
+    # 执行查询
+    result = db.execute(sql, params)
+    items = result.fetchall()
 
     # 转换为公共模型
     history_items = []
-    for item in items:
-        item_data = schemas.AnalysisRecordPublic.from_orm(item)
-        item_data.has_image = bool(item.image_data)
+    for row in items:
+        item_dict = {
+            'id': row[0],
+            'user_id': row[1],
+            'platform': row[2],
+            'image_hash': row[3],
+            'image_data': row[4],
+            'report_data': row[5],
+            'analysis_metadata': row[6],
+            'created_at': row[7],
+            'visibility': 'private'  # 默认值
+        }
+
+        item_data = schemas.AnalysisRecordPublic(**item_dict)
+        item_data.has_image = bool(row[4])  # image_data
         history_items.append(item_data)
 
     return schemas.PaginatedResponse(
@@ -78,10 +124,35 @@ async def get_analysis_record(
     如果记录是公开的，任何人都可以访问（返回公开信息）
     如果记录是私有的，只有所有者可以访问（返回完整信息）
     """
-    # 查询记录
-    record = db.query(models.AnalysisRecord).filter(
-        models.AnalysisRecord.id == record_id
-    ).first()
+    # 查询记录 - 使用原始SQL避免字段不存在的问题
+    sql = """
+        SELECT id, user_id, platform, image_hash, image_data,
+               report_data, analysis_metadata, created_at
+        FROM analysis_records
+        WHERE id = :record_id
+    """
+    result = db.execute(sql, {"record_id": record_id})
+    row = result.fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="分析记录不存在"
+        )
+
+    # 创建记录对象
+    class SimpleAnalysisRecord:
+        def __init__(self, row):
+            self.id = row[0]
+            self.user_id = row[1]
+            self.platform = row[2]
+            self.image_hash = row[3]
+            self.image_data = row[4]
+            self.report_data = row[5]
+            self.analysis_metadata = row[6]
+            self.created_at = row[7]
+
+    record = SimpleAnalysisRecord(row)
 
     if not record:
         raise HTTPException(
@@ -130,10 +201,28 @@ async def delete_analysis_record(
     db: Session = Depends(get_db)
 ):
     """删除分析记录"""
-    record = db.query(models.AnalysisRecord).filter(
-        models.AnalysisRecord.id == record_id,
-        models.AnalysisRecord.user_id == current_user.id
-    ).first()
+    # 使用原始SQL查询，避免字段不存在的问题
+    sql = """
+        SELECT id, user_id
+        FROM analysis_records
+        WHERE id = :record_id AND user_id = :user_id
+    """
+    result = db.execute(sql, {"record_id": record_id, "user_id": current_user.id})
+    row = result.fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="分析记录不存在或无权访问"
+        )
+
+    # 创建简单的记录对象用于删除
+    class SimpleRecord:
+        def __init__(self, id, user_id):
+            self.id = id
+            self.user_id = user_id
+
+    record = SimpleRecord(row[0], row[1])
 
     if not record:
         raise HTTPException(
@@ -141,7 +230,9 @@ async def delete_analysis_record(
             detail="分析记录不存在或无权访问"
         )
 
-    db.delete(record)
+    # 使用原始SQL删除
+    delete_sql = "DELETE FROM analysis_records WHERE id = :record_id AND user_id = :user_id"
+    db.execute(delete_sql, {"record_id": record_id, "user_id": current_user.id})
     db.commit()
 
     return schemas.SuccessResponse(message="分析记录已删除")
@@ -154,10 +245,29 @@ async def get_analysis_image(
     db: Session = Depends(get_db)
 ):
     """获取分析记录的图片（如果存在）"""
-    record = db.query(models.AnalysisRecord).filter(
-        models.AnalysisRecord.id == record_id,
-        models.AnalysisRecord.user_id == current_user.id
-    ).first()
+    # 使用原始SQL查询，避免字段不存在的问题
+    sql = """
+        SELECT id, user_id, image_data
+        FROM analysis_records
+        WHERE id = :record_id AND user_id = :user_id
+    """
+    result = db.execute(sql, {"record_id": record_id, "user_id": current_user.id})
+    row = result.fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="分析记录不存在或无权访问"
+        )
+
+    # 创建简单的记录对象
+    class SimpleRecord:
+        def __init__(self, id, user_id, image_data):
+            self.id = id
+            self.user_id = user_id
+            self.image_data = image_data
+
+    record = SimpleRecord(row[0], row[1], row[2])
 
     if not record:
         raise HTTPException(
