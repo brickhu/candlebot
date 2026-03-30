@@ -30,49 +30,111 @@ async def get_analysis_history(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取分析历史记录 - 使用ORM"""
-    print(f"🔍 使用ORM: 获取用户 {current_user.id} 的分析历史")
+    """获取分析历史记录 - 使用原始SQL避免字段不存在的问题"""
+    print(f"🔍 获取用户 {current_user.id} 的分析历史")
 
     try:
-        # 使用ORM查询
-        from sqlalchemy import func
+        # 使用原始SQL查询，避免字段不存在的问题
+        from sqlalchemy import text
 
-        # 构建基础查询
-        query = db.query(models.AnalysisRecord).filter(
-            models.AnalysisRecord.user_id == current_user.id
-        )
+        # 构建基础SQL - 检查是否有visibility字段
+        # 首先检查表结构
+        check_sql = text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'analysis_records'
+            AND column_name = 'visibility'
+        """)
+
+        has_visibility = False
+        try:
+            check_result = db.execute(check_sql)
+            has_visibility = check_result.fetchone() is not None
+            print(f"📊 数据库是否有visibility字段: {has_visibility}")
+        except:
+            print("⚠️  无法检查表结构，假设没有visibility字段")
+
+        # 根据是否有visibility字段构建SQL
+        if has_visibility:
+            sql_base = """
+                SELECT id, user_id, platform, image_hash, image_data,
+                       report_data, analysis_metadata, visibility, created_at
+                FROM analysis_records
+                WHERE user_id = :user_id
+            """
+        else:
+            sql_base = """
+                SELECT id, user_id, platform, image_hash, image_data,
+                       report_data, analysis_metadata, created_at
+                FROM analysis_records
+                WHERE user_id = :user_id
+            """
+
+        # 构建计数SQL
+        count_sql = """
+            SELECT COUNT(*)
+            FROM analysis_records
+            WHERE user_id = :user_id
+        """
+
+        params = {"user_id": current_user.id}
 
         # 应用筛选
         if platform:
-            query = query.filter(models.AnalysisRecord.platform == platform)
+            sql_base += " AND platform = :platform"
+            count_sql += " AND platform = :platform"
+            params["platform"] = platform
+
         if pair:
-            # 对于SQLite，使用JSON函数
-            query = query.filter(
-                func.json_extract(models.AnalysisRecord.analysis_metadata, '$.pair') == pair
-            )
+            # 对于PostgreSQL，使用JSON运算符
+            sql_base += " AND analysis_metadata->>'pair' = :pair"
+            count_sql += " AND analysis_metadata->>'pair' = :pair"
+            params["pair"] = pair
+
+        # 应用排序和分页
+        sql = sql_base + " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = per_page
+        params["offset"] = (page - 1) * per_page
+
+        # 执行查询
+        print(f"📊 执行查询...")
 
         # 计算总数
-        total = query.count()
+        count_result = db.execute(text(count_sql), params)
+        total = count_result.scalar()
         print(f"📊 总记录数: {total}")
 
-        # 应用分页
-        offset = (page - 1) * per_page
-        records = query.order_by(models.AnalysisRecord.created_at.desc()) \
-                      .offset(offset).limit(per_page).all()
-
-        print(f"📊 查询到 {len(records)} 条记录")
+        # 获取记录
+        result = db.execute(text(sql), params)
+        rows = result.fetchall()
+        print(f"📊 查询到 {len(rows)} 条记录")
 
         # 转换为响应格式
         items = []
-        for i, record in enumerate(records):
-            print(f"  处理记录 {i+1}: ID={record.id}")
+        for i, row in enumerate(rows):
+            print(f"  处理记录 {i+1}: ID={row[0]}")
             try:
-                # 获取analysis_metadata - 处理JSON字符串或字典
-                import json
-                if isinstance(record.analysis_metadata, str):
-                    metadata_dict = json.loads(record.analysis_metadata) if record.analysis_metadata else {}
+                # 根据是否有visibility字段确定字段位置
+                if has_visibility:
+                    # 有visibility字段: id, user_id, platform, image_hash, image_data,
+                    # report_data, analysis_metadata, visibility, created_at
+                    id_idx, user_id_idx, platform_idx, image_hash_idx, image_data_idx = 0, 1, 2, 3, 4
+                    report_data_idx, metadata_idx, visibility_idx, created_at_idx = 5, 6, 7, 8
+                    visibility = row[visibility_idx] if row[visibility_idx] is not None else 'private'
                 else:
-                    metadata_dict = record.analysis_metadata or {}
+                    # 没有visibility字段: id, user_id, platform, image_hash, image_data,
+                    # report_data, analysis_metadata, created_at
+                    id_idx, user_id_idx, platform_idx, image_hash_idx, image_data_idx = 0, 1, 2, 3, 4
+                    report_data_idx, metadata_idx, created_at_idx = 5, 6, 7
+                    visibility = 'private'  # 默认值
+
+                # 解析analysis_metadata
+                import json
+                metadata_str = row[metadata_idx]
+                if isinstance(metadata_str, str):
+                    metadata_dict = json.loads(metadata_str) if metadata_str else {}
+                else:
+                    metadata_dict = metadata_str or {}
 
                 # 创建AnalysisMetadata实例
                 analysis_metadata = schemas.AnalysisMetadata(
@@ -86,14 +148,14 @@ async def get_analysis_history(
 
                 # 创建AnalysisRecordPublic实例
                 item = schemas.AnalysisRecordPublic(
-                    id=record.id,
-                    user_id=record.user_id,
-                    platform=record.platform,
-                    image_hash=record.image_hash,
+                    id=row[id_idx],
+                    user_id=row[user_id_idx],
+                    platform=row[platform_idx],
+                    image_hash=row[image_hash_idx],
                     analysis_metadata=analysis_metadata,
-                    visibility=record.visibility if record.visibility else 'private',
-                    created_at=record.created_at,
-                    has_image=bool(record.image_data)
+                    visibility=visibility,
+                    created_at=row[created_at_idx],
+                    has_image=bool(row[image_data_idx])
                 )
                 items.append(item)
                 print(f"    ✅ 转换成功")

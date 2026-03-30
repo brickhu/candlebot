@@ -55,8 +55,18 @@ except Exception as e:
 
 # 运行数据库迁移（如果使用Alembic）
 if [ -f "alembic.ini" ]; then
-    echo "运行数据库迁移..."
+    echo "运行Alembic数据库迁移..."
     alembic upgrade head
+fi
+
+# 运行数据库迁移脚本
+echo "运行数据库迁移脚本..."
+if [ -f "migrate_postgres.py" ]; then
+    python migrate_postgres.py
+elif [ -f "simple_migration.py" ]; then
+    python simple_migration.py
+else
+    echo "⚠️  未找到数据库迁移脚本"
 fi
 
 # 启动服务
