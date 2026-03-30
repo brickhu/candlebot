@@ -31,8 +31,68 @@ app = FastAPI(
     description="AI驱动的K线图表分析API，支持用户系统和历史记录",
     version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    openapi_tags=[
+        {
+            "name": "authentication",
+            "description": "用户认证相关操作"
+        },
+        {
+            "name": "analysis",
+            "description": "K线图表分析"
+        },
+        {
+            "name": "conversation",
+            "description": "对话管理"
+        }
+    ]
 )
+
+# 配置OpenAPI安全方案
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # 添加安全方案
+    openapi_schema["components"] = {
+        "securitySchemes": {
+            "OAuth2PasswordBearer": {
+                "type": "oauth2",
+                "flows": {
+                    "password": {
+                        "tokenUrl": "auth/login",
+                        "scopes": {}
+                    }
+                }
+            }
+        }
+    }
+
+    # 为需要认证的端点添加安全要求
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        # 排除不需要认证的路径
+        if path in ["/", "/health", "/debug/db-test", "/debug/test-register",
+                   "/auth/register", "/auth/login", "/auth/login-json"]:
+            continue
+
+        for method in path_item.keys():
+            if method in ["get", "post", "put", "delete", "patch"]:
+                # 添加安全要求
+                path_item[method]["security"] = [{"OAuth2PasswordBearer": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # CORS中间件
 app.add_middleware(

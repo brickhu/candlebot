@@ -6,7 +6,7 @@ import json
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 
 import models
 import schemas
@@ -30,87 +30,93 @@ async def get_analysis_history(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取分析历史记录"""
-    # 构建查询
-    query = db.query(models.AnalysisRecord).filter(
-        models.AnalysisRecord.user_id == current_user.id
-    )
+    """获取分析历史记录 - 使用ORM"""
+    print(f"🔍 使用ORM: 获取用户 {current_user.id} 的分析历史")
 
-    # 应用筛选条件
-    if platform:
-        query = query.filter(models.AnalysisRecord.platform == platform)
-    if pair:
-        query = query.filter(models.AnalysisRecord.analysis_metadata["pair"].astext == pair)
+    try:
+        # 使用ORM查询
+        from sqlalchemy import func
 
-    # 计算总数 - 使用原始SQL避免字段不存在的问题
-    total = db.execute(
-        "SELECT COUNT(*) FROM analysis_records WHERE user_id = :user_id",
-        {"user_id": current_user.id}
-    ).scalar()
+        # 构建基础查询
+        query = db.query(models.AnalysisRecord).filter(
+            models.AnalysisRecord.user_id == current_user.id
+        )
 
-    # 应用分页和排序 - 使用原始SQL避免字段不存在的问题
-    sql = """
-        SELECT id, user_id, platform, image_hash, image_data,
-               report_data, analysis_metadata, created_at
-        FROM analysis_records
-        WHERE user_id = :user_id
-        {platform_filter}
-        {pair_filter}
-        ORDER BY created_at DESC
-        LIMIT :limit OFFSET :offset
-    """
+        # 应用筛选
+        if platform:
+            query = query.filter(models.AnalysisRecord.platform == platform)
+        if pair:
+            # 对于SQLite，使用JSON函数
+            query = query.filter(
+                func.json_extract(models.AnalysisRecord.analysis_metadata, '$.pair') == pair
+            )
 
-    # 构建参数
-    params = {
-        "user_id": current_user.id,
-        "limit": per_page,
-        "offset": (page - 1) * per_page
-    }
+        # 计算总数
+        total = query.count()
+        print(f"📊 总记录数: {total}")
 
-    # 添加平台筛选
-    platform_filter = ""
-    if platform:
-        platform_filter = "AND platform = :platform"
-        params["platform"] = platform
+        # 应用分页
+        offset = (page - 1) * per_page
+        records = query.order_by(models.AnalysisRecord.created_at.desc()) \
+                      .offset(offset).limit(per_page).all()
 
-    # 添加交易对筛选
-    pair_filter = ""
-    if pair:
-        pair_filter = "AND analysis_metadata->>'pair' = :pair"
-        params["pair"] = pair
+        print(f"📊 查询到 {len(records)} 条记录")
 
-    sql = sql.format(platform_filter=platform_filter, pair_filter=pair_filter)
+        # 转换为响应格式
+        items = []
+        for i, record in enumerate(records):
+            print(f"  处理记录 {i+1}: ID={record.id}")
+            try:
+                # 获取analysis_metadata - 处理JSON字符串或字典
+                import json
+                if isinstance(record.analysis_metadata, str):
+                    metadata_dict = json.loads(record.analysis_metadata) if record.analysis_metadata else {}
+                else:
+                    metadata_dict = record.analysis_metadata or {}
 
-    # 执行查询
-    result = db.execute(sql, params)
-    items = result.fetchall()
+                # 创建AnalysisMetadata实例
+                analysis_metadata = schemas.AnalysisMetadata(
+                    rating=metadata_dict.get('rating'),
+                    rating_score=metadata_dict.get('rating_score'),
+                    summary=metadata_dict.get('summary'),
+                    pair=metadata_dict.get('pair'),
+                    price=metadata_dict.get('price'),
+                    timeframe=metadata_dict.get('timeframe')
+                )
 
-    # 转换为公共模型
-    history_items = []
-    for row in items:
-        item_dict = {
-            'id': row[0],
-            'user_id': row[1],
-            'platform': row[2],
-            'image_hash': row[3],
-            'image_data': row[4],
-            'report_data': row[5],
-            'analysis_metadata': row[6],
-            'created_at': row[7],
-            'visibility': 'private'  # 默认值
-        }
+                # 创建AnalysisRecordPublic实例
+                item = schemas.AnalysisRecordPublic(
+                    id=record.id,
+                    user_id=record.user_id,
+                    platform=record.platform,
+                    image_hash=record.image_hash,
+                    analysis_metadata=analysis_metadata,
+                    visibility=record.visibility if record.visibility else 'private',
+                    created_at=record.created_at,
+                    has_image=bool(record.image_data)
+                )
+                items.append(item)
+                print(f"    ✅ 转换成功")
+            except Exception as e:
+                print(f"    ❌ 转换失败: {type(e).__name__}: {e}")
+                continue
 
-        item_data = schemas.AnalysisRecordPublic(**item_dict)
-        item_data.has_image = bool(row[4])  # image_data
-        history_items.append(item_data)
+        print(f"✅ 成功转换 {len(items)} 条记录")
 
-    return schemas.PaginatedResponse(
-        items=history_items,
-        total=total,
-        page=page,
-        per_page=per_page,
-        total_pages=(total + per_page - 1) // per_page
-    )
+        # 返回分页响应
+        return schemas.PaginatedResponse(
+            items=items,
+            total=total,
+            page=page,
+            per_page=per_page,
+            total_pages=(total + per_page - 1) // per_page if per_page > 0 else 0
+        )
+
+    except Exception as e:
+        print(f"❌ /analysis/history 错误: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @router.get("/{record_id}", response_model=Union[schemas.AnalysisRecordInDB, schemas.AnalysisRecordPublic])
@@ -125,12 +131,12 @@ async def get_analysis_record(
     如果记录是私有的，只有所有者可以访问（返回完整信息）
     """
     # 查询记录 - 使用原始SQL避免字段不存在的问题
-    sql = """
+    sql = text("""
         SELECT id, user_id, platform, image_hash, image_data,
-               report_data, analysis_metadata, created_at
+               report_data, analysis_metadata, visibility, created_at
         FROM analysis_records
         WHERE id = :record_id
-    """
+    """)
     result = db.execute(sql, {"record_id": record_id})
     row = result.fetchone()
 
@@ -148,9 +154,12 @@ async def get_analysis_record(
             self.platform = row[2]
             self.image_hash = row[3]
             self.image_data = row[4]
-            self.report_data = row[5]
-            self.analysis_metadata = row[6]
-            self.created_at = row[7]
+            # 解析JSON字符串为字典
+            import json
+            self.report_data = json.loads(row[5]) if row[5] else {}
+            self.analysis_metadata = json.loads(row[6]) if row[6] else {}
+            self.visibility = row[7] if row[7] is not None else 'private'
+            self.created_at = row[8]
 
     record = SimpleAnalysisRecord(row)
 
@@ -191,7 +200,16 @@ async def get_analysis_record(
         )
 
     # 所有者访问，返回完整信息
-    return record
+    return schemas.AnalysisRecordInDB(
+        id=record.id,
+        user_id=record.user_id,
+        platform=record.platform,
+        image_hash=record.image_hash,
+        analysis_metadata=record.analysis_metadata,
+        visibility=getattr(record, 'visibility', 'private'),
+        report_data=record.report_data,
+        created_at=record.created_at
+    )
 
 
 @router.delete("/{record_id}", response_model=schemas.SuccessResponse)
@@ -202,11 +220,11 @@ async def delete_analysis_record(
 ):
     """删除分析记录"""
     # 使用原始SQL查询，避免字段不存在的问题
-    sql = """
+    sql = text("""
         SELECT id, user_id
         FROM analysis_records
         WHERE id = :record_id AND user_id = :user_id
-    """
+    """)
     result = db.execute(sql, {"record_id": record_id, "user_id": current_user.id})
     row = result.fetchone()
 
@@ -231,7 +249,7 @@ async def delete_analysis_record(
         )
 
     # 使用原始SQL删除
-    delete_sql = "DELETE FROM analysis_records WHERE id = :record_id AND user_id = :user_id"
+    delete_sql = text("DELETE FROM analysis_records WHERE id = :record_id AND user_id = :user_id")
     db.execute(delete_sql, {"record_id": record_id, "user_id": current_user.id})
     db.commit()
 
@@ -246,11 +264,11 @@ async def get_analysis_image(
 ):
     """获取分析记录的图片（如果存在）"""
     # 使用原始SQL查询，避免字段不存在的问题
-    sql = """
+    sql = text("""
         SELECT id, user_id, image_data
         FROM analysis_records
         WHERE id = :record_id AND user_id = :user_id
-    """
+    """)
     result = db.execute(sql, {"record_id": record_id, "user_id": current_user.id})
     row = result.fetchone()
 
@@ -369,13 +387,14 @@ async def get_analysis_stats(
      .all()
 
     # 最常分析的交易对（前5）
+    # 对于SQLite，使用JSON函数提取pair字段
     top_pairs = db.query(
-        models.AnalysisRecord.analysis_metadata["pair"].astext.label("pair"),
+        func.json_extract(models.AnalysisRecord.analysis_metadata, '$.pair').label("pair"),
         func.count(models.AnalysisRecord.id).label("count")
     ).filter(
         models.AnalysisRecord.user_id == current_user.id,
-        models.AnalysisRecord.analysis_metadata["pair"].isnot(None)
-    ).group_by(models.AnalysisRecord.analysis_metadata["pair"].astext) \
+        func.json_extract(models.AnalysisRecord.analysis_metadata, '$.pair').isnot(None)
+    ).group_by(func.json_extract(models.AnalysisRecord.analysis_metadata, '$.pair')) \
      .order_by(func.count(models.AnalysisRecord.id).desc()) \
      .limit(5) \
      .all()

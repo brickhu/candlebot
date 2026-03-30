@@ -28,6 +28,7 @@ pwd_context = CryptContext(
 
 # OAuth2方案
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -106,7 +107,7 @@ async def get_current_active_user(
 
 
 async def get_current_user_optional(
-    token: Optional[str] = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db)
 ) -> Optional[models.User]:
     """获取当前用户（可选）

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source venv/bin/activate && pip list | grep -E \"fastapi|uvicorn|sqlalchemy\")",
+      "Bash(source venv/bin/activate && pip install -r requirements.txt)",
+      "Bash(source venv/bin/activate && python main.py)",
+      "Bash(source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(source venv/bin/activate && python --version)",
+      "Bash(curl -s http://localhost:8000/docs | head -20)",
+      "Bash(python3 -c \"import httpx; print\\('httpx version:', httpx.__version__\\)\")",
+      "Bash(/Users/free/Projects/candlebot/backend/venv/bin/python -c \"import httpx; print\\('httpx version:', httpx.__version__\\)\")"
+    ]
+  }
+}
