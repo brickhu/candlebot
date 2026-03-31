@@ -3,10 +3,23 @@
 """
 import hashlib
 import json
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, text
+
+def parse_json_field(value: Any) -> dict:
+    """解析JSON字段，处理字符串或字典类型"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value) if value.strip() else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 import models
 import schemas
@@ -129,12 +142,7 @@ async def get_analysis_history(
                     visibility = 'private'  # 默认值
 
                 # 解析analysis_metadata
-                import json
-                metadata_str = row[metadata_idx]
-                if isinstance(metadata_str, str):
-                    metadata_dict = json.loads(metadata_str) if metadata_str else {}
-                else:
-                    metadata_dict = metadata_str or {}
+                metadata_dict = parse_json_field(row[metadata_idx])
 
                 # 创建AnalysisMetadata实例
                 analysis_metadata = schemas.AnalysisMetadata(
@@ -240,10 +248,9 @@ async def get_analysis_record(
             self.platform = row[2]
             self.image_hash = row[3]
             self.image_data = row[4]
-            # 解析JSON字符串为字典
-            import json
-            self.report_data = json.loads(row[5]) if row[5] else {}
-            self.analysis_metadata = json.loads(row[6]) if row[6] else {}
+            # 处理JSON数据 - 可能是字符串或字典
+            self.report_data = parse_json_field(row[5])
+            self.analysis_metadata = parse_json_field(row[6])
             self.visibility = row[7] if row[7] is not None else 'private'
             self.created_at = row[8]
 
