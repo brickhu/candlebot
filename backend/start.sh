@@ -69,6 +69,14 @@ else
     echo "⚠️  未找到数据库迁移脚本"
 fi
 
+# 确保 visibility 字段存在（Railway 环境特别需要）
+echo "确保 visibility 字段存在..."
+if [ -f "fix_visibility_now.py" ]; then
+    python fix_visibility_now.py
+else
+    echo "⚠️  未找到 visibility 修复脚本"
+fi
+
 # 启动服务
 echo "启动 FastAPI 服务..."
 

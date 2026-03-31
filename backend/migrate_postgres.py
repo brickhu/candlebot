@@ -10,7 +10,13 @@ from sqlalchemy.exc import SQLAlchemyError
 # 从环境变量获取数据库URL
 def get_database_url():
     """获取数据库连接URL"""
-    # 尝试从多个环境变量文件读取
+    # 优先从环境变量读取（Railway、Docker等环境使用）
+    env_database_url = os.getenv('DATABASE_URL')
+    if env_database_url:
+        print(f"📄 从环境变量读取DATABASE_URL: {env_database_url[:50]}...")
+        return env_database_url
+
+    # 尝试从多个环境变量文件读取（本地开发使用）
     env_files = ['.env.local', '.env.development', '.env']
 
     for env_file in env_files:
@@ -20,11 +26,13 @@ def get_database_url():
                 for line in f:
                     line = line.strip()
                     if line.startswith('DATABASE_URL='):
-                        return line.split('=', 1)[1]
+                        url = line.split('=', 1)[1]
+                        print(f"📄 从文件读取DATABASE_URL: {url[:50]}...")
+                        return url
 
     # 默认值
     default_url = "postgresql://postgres:postgres@localhost:5432/candlebot"
-    print(f"⚠️  未找到DATABASE_URL环境变量，使用默认值: {default_url}")
+    print(f"⚠️  未找到DATABASE_URL，使用默认值: {default_url}")
     return default_url
 
 def add_visibility_column():

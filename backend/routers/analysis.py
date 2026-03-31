@@ -192,13 +192,37 @@ async def get_analysis_record(
     如果记录是公开的，任何人都可以访问（返回公开信息）
     如果记录是私有的，只有所有者可以访问（返回完整信息）
     """
-    # 查询记录 - 使用原始SQL避免字段不存在的问题
-    sql = text("""
-        SELECT id, user_id, platform, image_hash, image_data,
-               report_data, analysis_metadata, visibility, created_at
-        FROM analysis_records
-        WHERE id = :record_id
-    """)
+    # 首先检查 visibility 列是否存在
+    try:
+        check_sql = text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'analysis_records'
+            AND column_name = 'visibility'
+        """)
+        check_result = db.execute(check_sql)
+        has_visibility = check_result.fetchone() is not None
+    except Exception:
+        # 如果检查失败，假设列不存在
+        has_visibility = False
+
+    # 根据 visibility 列是否存在构建查询
+    if has_visibility:
+        sql = text("""
+            SELECT id, user_id, platform, image_hash, image_data,
+                   report_data, analysis_metadata, visibility, created_at
+            FROM analysis_records
+            WHERE id = :record_id
+        """)
+    else:
+        # 如果 visibility 列不存在，使用默认值 'private'
+        sql = text("""
+            SELECT id, user_id, platform, image_hash, image_data,
+                   report_data, analysis_metadata, 'private' as visibility, created_at
+            FROM analysis_records
+            WHERE id = :record_id
+        """)
+
     result = db.execute(sql, {"record_id": record_id})
     row = result.fetchone()
 
