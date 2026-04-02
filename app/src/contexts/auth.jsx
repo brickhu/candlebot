@@ -1,6 +1,5 @@
 import { createContext, createSignal, useContext, onMount, createEffect, Suspense } from 'solid-js'
 import { api } from '../lib/api'
-import { getLoginRedirectUrl, getRegisterRedirectUrl } from '../lib/redirect'
 import Spinner from '../components/Spinner'
 
 const AuthContext = createContext()
@@ -86,7 +85,16 @@ export const AuthProvider = (props) => {
   //   if (!isPublicPage && !user()) {
   //     console.log('🚫 访问非公开页面但未认证，重定向到登录页')
   //     // 使用window.location进行重定向，因为AuthProvider不在Router内部
-  //     const redirectUrl = getLoginRedirectUrl()
+  //     const currentPath = window.location.pathname
+  //     let redirectUrl = '/login'
+  //
+  //     // 如果不是登录/注册页面，保存当前URL作为from参数
+  //     if (currentPath !== '/login' && currentPath !== '/register') {
+  //       const currentUrl = window.location.href
+  //       const encodedFrom = encodeURIComponent(currentUrl)
+  //       redirectUrl = `/login?from=${encodedFrom}`
+  //     }
+  //
   //     console.log('重定向到:', redirectUrl)
   //     window.location.href = redirectUrl
   //     return
@@ -177,7 +185,7 @@ export const AuthProvider = (props) => {
     setIsLoading(true)
     try {
       await api.logout()
-      await api.clearToken()
+      api.clearToken()
       setUser(null)
     } catch (error) {
       console.error('Logout failed:', error)

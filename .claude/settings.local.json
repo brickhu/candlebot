@@ -129,7 +129,9 @@
       "Bash(source venv/bin/activate && python3 -c \"import sys; sys.path.append\\('.'\\); from main import app; print\\('导入成功'\\)\")",
       "Bash(source venv/bin/activate && python3 quick_test.py)",
       "Bash(source venv/bin/activate && python3 test_all_analysis.py)",
-      "Bash(source venv/bin/activate && python3 test_auth_errors.py)"
+      "Bash(source venv/bin/activate && python3 test_auth_errors.py)",
+      "Bash(python test_json_fix.py)",
+      "Bash(python3 test_json_fix.py)"
     ]
   }
 }

@@ -147,7 +147,8 @@ export default function NewPage() {
   
           // 跳转到分析结果页面
           if (response.data.record_id) {
-            onSuccess(response.data.record_id)
+            navigate("/analysis/"+response.data.record_id)
+            // onSuccess(response.data.record_id)
           } else {
             // 如果没有record_id，跳转到仪表板
             onSuccess(null)

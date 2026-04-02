@@ -13,17 +13,36 @@ import OAuthCallback from './pages/OAuthCallback';
 import UserTestPage from './pages/UserTest';
 import TestProxyPage from './pages/TestProxy';
 import TestUploadPage from './pages/TestUpload';
-import TestRedirectPage from './pages/TestRedirect';
 import NotFound from './pages/NotFound';
 import New from './pages/New';
+import Header from './components/Header';
 
 const root = document.getElementById('root')
+
+const RootLayout = props => {
+  return (
+    <>
+    {props?.children}
+    </>
+  )
+}
+
+const LayoutWithHeader = props => {
+  return(
+    <>
+      <Header/>
+      {props?.children}
+    </>
+  )
+}
+
 
 function App() {
   return (
 
     <AuthProvider>
-      <Router>
+      <Router root={RootLayout}>
+
         <Route path="/" component={Dashboard} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
@@ -38,7 +57,7 @@ function App() {
         <Route path="/test-proxy" component={TestProxyPage} />
         <Route path="/test-upload" component={TestUploadPage} />
         <Route path="/test-redirect" component={TestRedirectPage} /> */}
-        <Route path="*" component={NotFound} />
+        <Route path="*404" component={NotFound} />
       </Router>
     </AuthProvider>
 

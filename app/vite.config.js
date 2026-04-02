@@ -23,6 +23,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [solid(), tailwindcss()],
+    optimizeDeps: {
+      include: ['debug'],
+      esbuildOptions: {
+        // 确保 ES 模块兼容性
+        mainFields: ['module', 'main'],
+      },
+    },
     server: {
       port: 5173,
       host: true,

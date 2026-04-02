@@ -3,7 +3,6 @@ import { useNavigate } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
 import { extractOAuthCodeFromUrl, verifyOAuthState, clearOAuthProvider, getRedirectUri } from '../lib/oauth'
-import { redirectAfterAuth } from '../lib/redirect'
 
 const OAuthCallbackPage = () => {
   const [status, setStatus] = createSignal('processing')
@@ -108,7 +107,50 @@ const OAuthCallbackPage = () => {
       // 2秒后执行重定向
       setTimeout(() => {
         console.log('OAuth登录成功，执行重定向')
-        redirectAfterAuth(navigate)
+        console.log('调用重定向前的localStorage状态:')
+        console.log('oauth_redirect_url:', localStorage.getItem('oauth_redirect_url'))
+        console.log('oauth_provider:', localStorage.getItem('oauth_provider'))
+
+        // 获取重定向目标
+        const getRedirectTarget = () => {
+          console.log('开始获取重定向目标...')
+
+          // 1. 检查OAuth保存的重定向URL
+          const oauthRedirectUrl = localStorage.getItem('oauth_redirect_url')
+          console.log('检查localStorage中的oauth_redirect_url:', oauthRedirectUrl)
+
+          if (oauthRedirectUrl) {
+            console.log('从OAuth保存的URL获取重定向目标:', oauthRedirectUrl)
+            localStorage.removeItem('oauth_redirect_url') // 使用后清除
+            return oauthRedirectUrl
+          }
+
+          // 2. 默认返回首页
+          console.log('使用默认重定向目标: /')
+          return '/'
+        }
+
+        const target = getRedirectTarget()
+        console.log('执行重定向到:', target)
+
+        try {
+          // 解析目标URL，确保是有效的路径
+          let redirectPath = target
+          if (target.startsWith('http://') || target.startsWith('https://')) {
+            // 如果是完整URL，提取路径部分
+            const url = new URL(target)
+            redirectPath = url.pathname + url.search + url.hash
+          }
+
+          console.log('解析后的重定向路径:', redirectPath)
+          navigate(redirectPath)
+        } catch (error) {
+          console.error('重定向失败，使用默认路径:', error)
+          navigate('/')
+        }
+
+        // 重定向后清除OAuth provider
+        clearOAuthProvider()
       }, 2000)
 
     } catch (err) {
@@ -116,12 +158,9 @@ const OAuthCallbackPage = () => {
       setError(err.message || 'OAuth认证失败')
       setStatus('error')
 
-      // 5秒后跳转到登录页
-      setTimeout(() => {
-        navigate('/login')
-      }, 5000)
-    } finally {
+      // 立即跳转到登录页
       clearOAuthProvider()
+      navigate('/login')
     }
   })
 
@@ -172,7 +211,7 @@ const OAuthCallbackPage = () => {
             </div>
             <h1 class="text-2xl font-bold mb-3">登录失败</h1>
             <p class="text-red-400 mb-4">{error()}</p>
-            <p class="text-muted mb-6">5秒后跳转到登录页面...</p>
+            <p class="text-muted mb-6">正在跳转到登录页面...</p>
             <div class="w-full bg-gray-200 rounded-full h-1">
               <div class="bg-red-500 h-1 rounded-full animate-progress"></div>
             </div>

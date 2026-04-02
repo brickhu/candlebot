@@ -1,23 +1,34 @@
-import { Show, createSignal, onMount, createResource } from 'solid-js'
-import { useNavigate, useParams } from '@solidjs/router'
+import { createSignal, onMount, createResource,ErrorBoundary } from 'solid-js'
+import { useNavigate, useParams, useLocation } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
+import Header from '../components/Header'
+import MarkdownRenderer from '../components/MarkdownRenderer';
+import Modal from '../components/Modal'
 
 export default props => {
+  let _share
   const auth = useAuth()
   const navigate = useNavigate()
+  const localtion = useLocation()
   const params = useParams()
   const [isLoading, setIsLoading] = createSignal(true)
   const [result,{}] = createResource(()=>params?.id,async(id)=>{
     if(!id && typeof(id) != "number") return
     const response = await api.getAnalysis(id)
-    console.log('response: ', response);
+    // console.log('response: ', response);
+    if(response?.success){
+      return response?.data
+    }else{
+      throw response?.error
+    }
+    
   })
 
   onMount(async()=>{
         // 检查认证
     if(!auth?.isAuthenticated){
-      navigate('/login', { state: { from: `/analysis/${params.id}` } })
+      // navigate('/login', { state: { from: `/analysis/${params.id}` } })
       return
     }
     // if (!auth?.user?.()) {
@@ -25,10 +36,30 @@ export default props => {
     //   navigate('/login', { state: { from: `/analysis/${params.id}` } })
     //   return
     // }
-    console.log('分析ID:', params.id)
+    
   })
   return(
-    <div>{params.id}</div>
+    <>
+    <Header/>
+    <div>
+      <ErrorBoundary
+        fallback={(error, reset) => (
+          <div>
+            <p>{error?.message}</p>
+            <button onClick={reset} className='btn btn-accent'>Try Again</button>
+          </div>
+        )}
+      >
+      <Suspense fallback="loading...">
+        <MarkdownRenderer>{result()?.report_data?.report || `# no content`}</MarkdownRenderer>
+        <div>
+          <button className='btn btn-primary' onClick={()=>console.log(localtion)}>分享</button>
+        </div>
+      </Suspense>
+      </ErrorBoundary>
+    </div>
+    <Modal ref={_share} title={"hahaha"}/> 
+    </>
   )
 }
 

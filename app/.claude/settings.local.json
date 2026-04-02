@@ -2,7 +2,32 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(node -e \"\nconst url = 'http://localhost:5173/new?from_extension=true';\nconst encoded = encodeURIComponent\\(url\\);\nconsole.log\\('原始URL:', url\\);\nconsole.log\\('编码后:', encoded\\);\nconsole.log\\('解码后:', decodeURIComponent\\(encoded\\)\\);\n\")"
+      "Bash(node -e \"\nconst url = 'http://localhost:5173/new?from_extension=true';\nconst encoded = encodeURIComponent\\(url\\);\nconsole.log\\('原始URL:', url\\);\nconsole.log\\('编码后:', encoded\\);\nconsole.log\\('解码后:', decodeURIComponent\\(encoded\\)\\);\n\")",
+      "Bash(pkill -f \"vite\" || true)",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)",
+      "Bash(npm --version)",
+      "Bash(yarn add:*)",
+      "Bash(lsof -ti:5173)",
+      "Bash(ps -p 46889,91260 -o pid,command)",
+      "Bash(kill 91260)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python -c \"import fastapi; print\\('FastAPI version:', fastapi.__version__\\)\")",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python3 -c \"import fastapi; print\\('FastAPI version:', fastapi.__version__\\)\")",
+      "Bash(cd /Users/free/Projects/candlebot/backend && source venv/bin/activate && python3 -c \"import fastapi; print\\('FastAPI version:', fastapi.__version__\\)\")",
+      "Bash(cd /Users/free/Projects/candlebot/backend && source venv/bin/activate && python3 -m py_compile routers/auth.py)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && source venv/bin/activate && python3 test_logout.py)",
+      "Bash(source venv/bin/activate && python3 test_logout_full.py)",
+      "Bash(source venv/bin/activate && python3 main.py)",
+      "Bash(source venv/bin/activate && python3 -c \"from main import app; print\\('FastAPI应用加载成功'\\)\")",
+      "Bash(source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(lsof -ti:8000)",
+      "Bash(ps -p 19623,42289 -o pid,command)",
+      "Bash(source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8001 --reload)",
+      "Bash(ls -la /Users/free/Projects/candlebot/app/.env*)",
+      "Bash(curl -X POST http://localhost:8001/auth/logout -H \"Content-Type: application/json\" -H \"Authorization: Bearer invalidtoken\")",
+      "Bash(curl -X POST http://localhost:8001/auth/register -H \"Content-Type: application/json\" -d '{\"email\":\"testlogout2@example.com\",\"password\":\"test123\",\"username\":\"testlogout2\"}')",
+      "Bash(curl -X POST http://localhost:8001/auth/login-json -H \"Content-Type: application/json\" -d '{\"email\":\"testlogout2@example.com\",\"password\":\"test123\"}')",
+      "Bash(curl -X POST http://localhost:8001/auth/logout -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzc1NzA3ODUzfQ.Sdma0BsCCK6Qh07EjjEojdbfm_MSV1sX2FX6qIZ7ICk\")"
     ]
   }
 }

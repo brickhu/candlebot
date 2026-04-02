@@ -237,3 +237,36 @@ async def update_current_user(
     user_data = schemas.UserInDB.from_orm(current_user)
     user_data.quota_remaining = remaining
     return user_data
+
+
+@router.post("/logout", response_model=schemas.SuccessResponse)
+async def logout(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """用户登出
+
+    注意：由于JWT是无状态的，服务器端无法直接使token失效。
+    这个端点主要用于：
+    1. 记录登出时间（如果需要）
+    2. 返回成功响应让客户端清除token
+    3. 执行其他清理操作
+    """
+    try:
+        # 更新最后登出时间（如果需要）
+        from datetime import datetime
+        # 这里可以添加登出相关的逻辑，比如记录登出日志等
+
+        print(f"用户登出: user_id={current_user.id}, email={current_user.email}")
+
+        return schemas.SuccessResponse(
+            message="登出成功",
+            data={"user_id": current_user.id}
+        )
+    except Exception as e:
+        print(f"登出过程中发生错误: {e}")
+        # 即使有错误，也返回成功，让客户端可以清除token
+        return schemas.SuccessResponse(
+            message="登出成功",
+            data={"user_id": current_user.id}
+        )

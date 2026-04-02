@@ -1,6 +1,6 @@
 import { useAuth } from "../contexts/auth"
 import Avatar from "./Avatar"
-import { useNavigate } from "@solidjs/router"
+import { useNavigate,useLocation } from "@solidjs/router"
 import { t,setDictionarys,locale,setLocale,locales } from "../i18n"
 import { Icon } from "@iconify-icon/solid"
 import { For } from "solid-js"
@@ -8,22 +8,32 @@ import { For } from "solid-js"
 export default props => {
   const auth = useAuth()
   const navigate = useNavigate()
-
-  const handleUserLogout = ()=>{
+  const location = useLocation()
+  const handleUserLogout = async ()=>{
     if(auth?.isLoading()){
       return
     }
-    auth?.logout()
-    console.log('Logout')
+    try {
+      console.log('🚪 Header: 用户请求退出登录')
+      await auth?.logout()
+      console.log('✅ Header: 退出登录成功')
+      // 关闭模态框
+      document.getElementById('modal_logout')?.close()
+      // 重定向到首页
+      navigate('/')
+    } catch (error) {
+      console.error('❌ Header: 退出登录失败:', error)
+      alert('Logout failed. Please try again.')
+    }
   }
   const handleLogin = () =>{
-    navigate("/login")
+    navigate("/login",{ state: { from: location?.pathname } })
   }
   return(
     <>
     <div className="navbar bg-base-100 shadow-sm">
       <div className="flex-1">
-        <a className="btn btn-ghost text-xl" onClick={()=>console.log(auth?.user())}>Candlebot</a>
+        <a className="btn btn-ghost text-xl" onClick={()=>navigate("/")}>Candlebot</a>
       </div>
       <div className="flex gap-2">
         <input type="text" placeholder="Search" className="input input-bordered w-24 md:w-auto" />

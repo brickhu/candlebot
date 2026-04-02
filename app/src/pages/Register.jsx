@@ -2,7 +2,6 @@ import { createSignal } from 'solid-js'
 import { useNavigate, A } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
-import { redirectAfterAuth } from '../lib/redirect'
 
 const RegisterPage = () => {
   console.log('🔧 RegisterPage组件开始渲染')
@@ -19,6 +18,24 @@ const RegisterPage = () => {
   console.log('🔧 auth.register:', auth?.register)
   console.log('🔧 auth.register的类型:', typeof auth?.register)
   const navigate = useNavigate()
+
+  // 获取重定向来源
+  const getRedirectPath = () => {
+    // 1. 优先从URL参数中获取
+    const urlParams = new URLSearchParams(window.location.search)
+    const fromParam = urlParams.get('from')
+    if (fromParam) {
+      try {
+        return decodeURIComponent(fromParam)
+      } catch (error) {
+        console.error('解码from参数失败:', error)
+        return fromParam
+      }
+    }
+
+    // 2. 默认返回首页
+    return '/'
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -48,7 +65,9 @@ const RegisterPage = () => {
       const success = await auth.register(email(), username(), password())
       if (success) {
         console.log('注册成功，执行重定向')
-        redirectAfterAuth(navigate)
+        const redirectPath = getRedirectPath()
+        console.log('重定向到:', redirectPath)
+        navigate(redirectPath)
       } else {
         setError('Registration failed. Please try again.')
       }

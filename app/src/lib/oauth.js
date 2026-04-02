@@ -65,13 +65,22 @@ export function extractOAuthCodeFromUrl() {
 }
 
 // 设置当前OAuth provider
-export function setOAuthProvider(provider) {
+export function setOAuthProvider(provider, fromUrl = null) {
   localStorage.setItem('oauth_provider', provider)
 
-  // 保存当前页面的完整URL，用于OAuth登录成功后重定向
-  const currentUrl = window.location.href
-  localStorage.setItem('oauth_redirect_url', currentUrl)
-  console.log('保存OAuth重定向URL:', currentUrl)
+  // 保存登录前的页面URL，用于OAuth登录成功后重定向
+  // 优先使用传入的fromUrl，否则使用当前页面URL
+  let redirectUrl = fromUrl || window.location.href
+
+  // 如果fromUrl是相对路径，转换为完整URL
+  if (fromUrl && !fromUrl.startsWith('http://') && !fromUrl.startsWith('https://')) {
+    // 如果是相对路径，添加当前origin
+    redirectUrl = window.location.origin + (fromUrl.startsWith('/') ? fromUrl : '/' + fromUrl)
+    console.log('将相对路径转换为完整URL:', fromUrl, '->', redirectUrl)
+  }
+
+  localStorage.setItem('oauth_redirect_url', redirectUrl)
+  console.log('保存OAuth重定向URL:', redirectUrl)
 }
 
 // 清除OAuth provider

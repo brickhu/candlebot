@@ -1,8 +1,7 @@
 import { createSignal, onMount } from 'solid-js'
-import { useNavigate, A } from '@solidjs/router'
+import { useNavigate, A, useLocation } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
-import { redirectAfterAuth } from '../lib/redirect'
 
 
 const LoginPage = () => {
@@ -13,25 +12,31 @@ const LoginPage = () => {
 
   const auth = useAuth()
   const navigate = useNavigate()
+  const location = useLocation();
+
 
   // 获取重定向来源（兼容旧代码）
   const getRedirectPath = () => {
+    // 1. 优先从URL参数中获取
     const urlParams = new URLSearchParams(window.location.search)
-    const from = urlParams.get('from')
-    console.log('登录页面，重定向来源:', from)
-
-    if (from) {
+    const fromParam = urlParams.get('from')
+    if (fromParam) {
       try {
-        const decodedFrom = decodeURIComponent(from)
-        console.log('解码后的重定向来源:', decodedFrom)
-        return decodedFrom
+        return decodeURIComponent(fromParam)
       } catch (error) {
         console.error('解码from参数失败:', error)
-        return from
+        return fromParam
       }
     }
 
-    return '/dashboard'
+    // 2. 从location.state中获取
+    const { from } = location?.state || {}
+    if (from) {
+      return from
+    }
+
+    // 3. 默认返回首页
+    return '/'
   }
 
   const handleSubmit = async (e) => {
@@ -42,9 +47,7 @@ const LoginPage = () => {
     try {
       const success = await auth.login(email(), password())
       if (success) {
-        console.log('Login successful')
-        navigate(-1)
-        // redirectAfterAuth(navigate)
+        navigate(getRedirectPath())
       } else {
         setError('Invalid email or password')
       }
@@ -59,11 +62,22 @@ const LoginPage = () => {
   const handleOAuthLogin = (provider) => {
     import('../lib/oauth').then(({ getOAuthAuthUrl, setOAuthProvider, getRedirectUri }) => {
       const redirectUri = getRedirectUri()
-      setOAuthProvider(provider)
+
+      // 获取重定向来源（如果有）
+      const fromUrl = getRedirectPath()
+      console.log('OAuth登录 - 获取重定向来源:', fromUrl)
+      console.log('当前页面URL:', window.location.href)
+
+      setOAuthProvider(provider, fromUrl)
       const authUrl = getOAuthAuthUrl(provider, redirectUri)
+      console.log('跳转到OAuth授权URL:', authUrl)
       window.location.href = authUrl
     })
   }
+
+  onMount(()=>{
+    console.log("dddddd->",location)
+  })
 
   return (
     <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center px-6 py-12 animate-fade-in">

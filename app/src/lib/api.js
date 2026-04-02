@@ -41,33 +41,33 @@ class ApiClient {
     }
 
     const url = `${this.baseUrl}${endpoint}`
-    console.log(`🌐 API请求: ${url}`)
-    console.log(`环境: ${import.meta.env.DEV ? '开发' : '生产'}`)
-    console.log(`baseUrl: ${this.baseUrl}`)
+    // console.log(`🌐 API请求: ${url}`)
+    // console.log(`环境: ${import.meta.env.DEV ? '开发' : '生产'}`)
+    // console.log(`baseUrl: ${this.baseUrl}`)
 
     try {
-      console.log(`📡 发送请求到: ${url}`)
-      console.log(`请求方法: ${options.method || 'GET'}`)
-      console.log(`请求头:`, headers)
-      console.log(`请求体:`, options.body || '无')
+      // console.log(`📡 发送请求到: ${url}`)
+      // console.log(`请求方法: ${options.method || 'GET'}`)
+      // console.log(`请求头:`, headers)
+      // console.log(`请求体:`, options.body || '无')
 
       const response = await fetch(url, {
         ...options,
         headers,
       })
 
-      console.log(`📨 收到响应: ${response.status} ${response.statusText}`)
-      console.log(`响应头:`, Object.fromEntries(response.headers.entries()))
+      // console.log(`📨 收到响应: ${response.status} ${response.statusText}`)
+      // console.log(`响应头:`, Object.fromEntries(response.headers.entries()))
 
       // 尝试解析响应体
       let data
       try {
         const text = await response.text()
-        console.log(`响应体原始文本:`, text.substring(0, 500) + (text.length > 500 ? '...' : ''))
+        // console.log(`响应体原始文本:`, text.substring(0, 500) + (text.length > 500 ? '...' : ''))
 
         if (text) {
           data = JSON.parse(text)
-          console.log(`解析后的响应数据:`, data)
+          // console.log(`解析后的响应数据:`, data)
         } else {
           console.log('响应体为空')
           data = {}
@@ -135,9 +135,18 @@ class ApiClient {
   }
 
   async logout() {
-    return this.request('/auth/logout', {
+    console.log('🚪 发送登出请求...')
+    const result = await this.request('/auth/logout', {
       method: 'POST',
     })
+
+    if (result.success) {
+      console.log('✅ 登出成功:', result.data)
+    } else {
+      console.warn('⚠️ 登出请求失败，但客户端仍会清除token:', result.error)
+    }
+
+    return result
   }
 
   // OAuth endpoints
@@ -159,10 +168,10 @@ class ApiClient {
   }
 
   async analyzeImage(imageBase64, platform = "tradingview", lang = "zh") {
-    console.log('📸 提交图片分析请求')
-    console.log('平台:', platform)
-    console.log('语言:', lang)
-    console.log('图片大小:', imageBase64.length, '字符')
+    // console.log('📸 提交图片分析请求')
+    // console.log('平台:', platform)
+    // console.log('语言:', lang)
+    // console.log('图片大小:', imageBase64.length, '字符')
 
     return this.request('/analyze', {
       method: 'POST',
@@ -178,7 +187,7 @@ class ApiClient {
   setToken(token) {
     this.token = token
     localStorage.setItem(KEYS.AUTH_TOKEN, token)
-    console.log("setToken(): 已设置token，长度:", token?.length || 0)
+    // console.log("setToken(): 已设置token，长度:", token?.length || 0)
   }
 
   clearToken() {
