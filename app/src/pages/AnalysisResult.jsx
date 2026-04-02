@@ -1,4 +1,4 @@
-import { createSignal, onMount, createResource,ErrorBoundary } from 'solid-js'
+import { createSignal, onMount, createResource,ErrorBoundary,Suspense } from 'solid-js'
 import { useNavigate, useParams, useLocation } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
@@ -19,6 +19,18 @@ export default props => {
     // console.log('response: ', response);
     if(response?.success){
       return response?.data
+    }else{
+      throw response?.error
+    }
+    
+  })
+
+  const [imageBase64,{}] = createResource(()=>params?.id,async(id)=>{
+    if(!id && typeof(id) != "number") return
+    const response = await api.getAnalysisImage(id)
+    console.log('图片相应: ', response);
+    if(response?.success){
+      return response?.data?.image_data
     }else{
       throw response?.error
     }
@@ -50,6 +62,9 @@ export default props => {
           </div>
         )}
       >
+      <Suspense fallback="loading image ...">
+        <img src={imageBase64()} alt=""/>
+      </Suspense>
       <Suspense fallback="loading...">
         <MarkdownRenderer>{result()?.report_data?.report || `# no content`}</MarkdownRenderer>
         <div>

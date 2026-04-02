@@ -1,7 +1,8 @@
 import { createSignal, onMount } from 'solid-js'
-import { useNavigate, A, useLocation } from '@solidjs/router'
+import { useNavigate, A,useLocation } from '@solidjs/router'
 import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
+
 
 
 const LoginPage = () => {
@@ -17,19 +18,7 @@ const LoginPage = () => {
 
   // 获取重定向来源（兼容旧代码）
   const getRedirectPath = () => {
-    // 1. 优先从URL参数中获取
-    const urlParams = new URLSearchParams(window.location.search)
-    const fromParam = urlParams.get('from')
-    if (fromParam) {
-      try {
-        return decodeURIComponent(fromParam)
-      } catch (error) {
-        console.error('解码from参数失败:', error)
-        return fromParam
-      }
-    }
 
-    // 2. 从location.state中获取
     const { from } = location?.state || {}
     if (from) {
       return from
@@ -48,6 +37,7 @@ const LoginPage = () => {
       const success = await auth.login(email(), password())
       if (success) {
         navigate(getRedirectPath())
+        // redirectAfterAuth(navigate)
       } else {
         setError('Invalid email or password')
       }
@@ -65,19 +55,13 @@ const LoginPage = () => {
 
       // 获取重定向来源（如果有）
       const fromUrl = getRedirectPath()
-      console.log('OAuth登录 - 获取重定向来源:', fromUrl)
-      console.log('当前页面URL:', window.location.href)
+      // const fromUrl = redirectPath !== '/' ? window.location.origin + redirectPath : null
 
       setOAuthProvider(provider, fromUrl)
       const authUrl = getOAuthAuthUrl(provider, redirectUri)
-      console.log('跳转到OAuth授权URL:', authUrl)
       window.location.href = authUrl
     })
   }
-
-  onMount(()=>{
-    console.log("dddddd->",location)
-  })
 
   return (
     <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center px-6 py-12 animate-fade-in">
@@ -203,9 +187,9 @@ const LoginPage = () => {
 
           <div class="mt-8 text-center text-sm text-muted">
             Don't have an account?{' '}
-            <A href={`/register?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark font-medium">
+            <a onClick={()=>navigate("/register",{state: {from: getRedirectPath()}})} class="text-primary hover:text-primary-dark font-medium">
               Sign up
-            </A>
+            </a>
           </div>
         </div>
       </div>

@@ -27,7 +27,22 @@
       "Bash(curl -X POST http://localhost:8001/auth/logout -H \"Content-Type: application/json\" -H \"Authorization: Bearer invalidtoken\")",
       "Bash(curl -X POST http://localhost:8001/auth/register -H \"Content-Type: application/json\" -d '{\"email\":\"testlogout2@example.com\",\"password\":\"test123\",\"username\":\"testlogout2\"}')",
       "Bash(curl -X POST http://localhost:8001/auth/login-json -H \"Content-Type: application/json\" -d '{\"email\":\"testlogout2@example.com\",\"password\":\"test123\"}')",
-      "Bash(curl -X POST http://localhost:8001/auth/logout -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzc1NzA3ODUzfQ.Sdma0BsCCK6Qh07EjjEojdbfm_MSV1sX2FX6qIZ7ICk\")"
+      "Bash(curl -X POST http://localhost:8001/auth/logout -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzc1NzA3ODUzfQ.Sdma0BsCCK6Qh07EjjEojdbfm_MSV1sX2FX6qIZ7ICk\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \".schema analysis_records\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT COUNT\\(*\\) FROM analysis_records;\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT id, user_id, platform, visibility FROM analysis_records LIMIT 5;\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT id, substr\\(analysis_metadata, 1, 100\\) as metadata_preview FROM analysis_records LIMIT 3;\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \".tables\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT id, user_id, platform, created_at FROM analysis_records ORDER BY id ASC LIMIT 10;\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT id, json_valid\\(analysis_metadata\\) as is_valid_json, length\\(analysis_metadata\\) as metadata_length FROM analysis_records LIMIT 5;\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db << 'EOF'\nSELECT \n    COUNT\\(*\\) as total_records,\n    SUM\\(CASE WHEN visibility IS NULL THEN 1 ELSE 0 END\\) as null_visibility,\n    SUM\\(CASE WHEN image_hash IS NULL THEN 1 ELSE 0 END\\) as null_image_hash,\n    SUM\\(CASE WHEN image_data IS NULL THEN 1 ELSE 0 END\\) as null_image_data,\n    SUM\\(CASE WHEN json_valid\\(analysis_metadata\\) = 0 THEN 1 ELSE 0 END\\) as invalid_json_metadata,\n    SUM\\(CASE WHEN json_valid\\(report_data\\) = 0 THEN 1 ELSE 0 END\\) as invalid_json_report\nFROM analysis_records;\nEOF)",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \".schema users\")",
+      "Bash(sqlite3 /Users/free/Projects/candlebot/backend/candlebot.db \"SELECT id, email, username, plan_type, quota_total, quota_used FROM users;\")",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python migration_manager.py --action status)",
+      "Bash(cd /Users/free/Projects/candlebot/backend && python3 migration_manager.py --action status)",
+      "Bash(source venv/bin/activate && python migration_manager.py --action status)",
+      "Bash(source venv/bin/activate && python data_validator.py --report-only)",
+      "Bash(source venv/bin/activate && python emergency_fix.py --no-backup)"
     ]
   }
 }

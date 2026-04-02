@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-04-02T22:55:03.782471",
+  "database_url": "sqlite:///./candlebot.db",
+  "tables": {
+    "analysis_records": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    },
+    "api_logs": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    },
+    "conversations": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    },
+    "payment_records": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    },
+    "users": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    },
+    "verification_codes": {
+      "structure_issues": [],
+      "data_issues": [],
+      "fixes": []
+    }
+  },
+  "summary": {
+    "total_issues": 0,
+    "total_fixed": 0,
+    "total_failed": 0
+  }
+}

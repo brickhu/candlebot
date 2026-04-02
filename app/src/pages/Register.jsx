@@ -19,23 +19,35 @@ const RegisterPage = () => {
   console.log('🔧 auth.register的类型:', typeof auth?.register)
   const navigate = useNavigate()
 
-  // 获取重定向来源
+  // // 获取重定向来源
+  // const getRedirectPath = () => {
+  //   // 1. 优先从URL参数中获取
+  //   const urlParams = new URLSearchParams(window.location.search)
+  //   const fromParam = urlParams.get('from')
+  //   if (fromParam) {
+  //     try {
+  //       return decodeURIComponent(fromParam)
+  //     } catch (error) {
+  //       console.error('解码from参数失败:', error)
+  //       return fromParam
+  //     }
+  //   }
+
+  //   // 2. 默认返回首页
+  //   return '/'
+  // }
+
   const getRedirectPath = () => {
-    // 1. 优先从URL参数中获取
-    const urlParams = new URLSearchParams(window.location.search)
-    const fromParam = urlParams.get('from')
-    if (fromParam) {
-      try {
-        return decodeURIComponent(fromParam)
-      } catch (error) {
-        console.error('解码from参数失败:', error)
-        return fromParam
-      }
+
+    const { from } = location?.state || {}
+    if (from) {
+      return from
     }
 
-    // 2. 默认返回首页
+    // 3. 默认返回首页
     return '/'
   }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -82,11 +94,16 @@ const RegisterPage = () => {
   const handleOAuthRegister = (provider) => {
     import('../lib/oauth').then(({ getOAuthAuthUrl, setOAuthProvider, getRedirectUri }) => {
       const redirectUri = getRedirectUri()
-      setOAuthProvider(provider)
+      const fromUrl = getRedirectPath()
+      setOAuthProvider(provider,fromUrl)
       const authUrl = getOAuthAuthUrl(provider, redirectUri)
       window.location.href = authUrl
     })
   }
+
+
+
+  
 
   return (
     <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center px-6 py-12 animate-fade-in">

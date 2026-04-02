@@ -138,24 +138,29 @@ export default function NewPage() {
   
         const response = await api.analyzeImage(screenshot(), platform(), language())
         console.log('📡 分析响应:', response)
-  
+
         if (response.success && response.data) {
           console.log('✅ 分析成功，记录ID:', response.data.record_id)
-  
-          // 关闭弹窗
-          // onClose()
-  
+
           // 跳转到分析结果页面
           if (response.data.record_id) {
             navigate("/analysis/"+response.data.record_id)
-            // onSuccess(response.data.record_id)
           } else {
             // 如果没有record_id，跳转到仪表板
-            onSuccess(null)
+            navigate("/dashboard")
           }
         } else {
           console.error('❌ 分析失败:', response.error)
-          setError(response.error?.message || '分析失败，请重试')
+
+          // 处理新的invalid_image错误类型
+          if (response.error?.code === 'invalid_image') {
+            // 图片不符合要求，配额已消耗
+            setError(`图片验证失败: ${response.error.message}`)
+            // 不清除已选择的图片，让用户可以重新提交或更换图片
+          } else {
+            // 其他错误
+            setError(response.error?.message || '分析失败，请重试')
+          }
         }
       } catch (error) {
         console.error('❌ 提交分析时发生错误:', error)

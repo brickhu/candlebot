@@ -162,3 +162,38 @@ def increment_user_quota(db: Session, user: models.User) -> int:
     db.refresh(user)
 
     return user.quota_total - user.quota_used
+
+
+def check_and_increment_quota(db: Session, user: models.User) -> tuple[bool, int]:
+    """检查并更新配额（所有图片上传都消耗配额）
+
+    参数:
+        db: 数据库会话
+        user: 用户对象
+
+    返回:
+        tuple[是否允许, 剩余次数]
+
+    说明:
+        - 所有图片上传都消耗配额，无论图片是否有效
+        - 先检查配额，如果不足则不允许上传
+    """
+    # 确保配额已重置
+    reset_user_quota_if_needed(db, user)
+
+    # 检查配额
+    allowed, remaining = check_user_quota(user)
+
+    if not allowed:
+        print(f"❌ 用户 {user.id} 配额不足，剩余: {remaining}")
+        return False, remaining
+
+    # 增加已使用配额（所有图片都扣减）
+    user.quota_used += 1
+    db.commit()
+    db.refresh(user)
+
+    new_remaining = user.quota_total - user.quota_used
+    print(f"✅ 用户 {user.id} 配额已扣减，剩余: {new_remaining}")
+
+    return True, new_remaining

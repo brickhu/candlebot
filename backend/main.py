@@ -13,6 +13,22 @@ from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 import httpx
+
+
+class InvalidImageError(HTTPException):
+    """自定义异常：无效图片错误"""
+    def __init__(self, reason: str, reason_en: str = None):
+        if reason_en is None:
+            reason_en = reason  # 暂时使用相同文本
+
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "invalid_image",
+                "message": f"图片不符合要求: {reason}",
+                "message_en": f"Invalid image: {reason_en}"
+            }
+        )
 from sqlalchemy.orm import Session
 
 # 导入自定义模块
@@ -142,7 +158,28 @@ DEEPSEEK_MODEL = "deepseek-chat"
 MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
 MINIMAX_MODEL = "MiniMax-Text-01"
 
-# 提示词配置（保持不变）
+# 验证提示词（第一阶段：快速验证）
+VALIDATION_PROMPT = """
+你是一个K线图表验证专家。请判断这张图片是否符合以下要求：
+
+要求：
+1. 必须是金融交易图表（K线图、蜡烛图）
+2. 必须包含价格走势信息
+3. 必须能识别交易对（如BTC/USD, ETH/USD等）
+4. 必须能识别时间周期（如1h, 4h, 1d等）
+
+请只回答以下格式之一：
+VALID: [交易对] [时间周期] [简要描述]
+INVALID: [原因]
+
+示例：
+VALID: BTC/USD 4h 比特币4小时K线图，包含价格和成交量
+INVALID: 这不是金融图表，看起来是网页截图
+INVALID: 无法识别交易对和时间周期
+INVALID: 图片模糊无法识别
+"""
+
+# 分析提示词（第二阶段：完整分析）
 PROMPT_AGGR = """
 你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
 
@@ -379,98 +416,55 @@ async def analyze(
     db: Session = Depends(get_db)
 ):
     """分析K线图表（需要用户认证）"""
-    # 检查用户配额
-    allowed, remaining = auth.check_user_quota(current_user)
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "error": "daily_limit_exceeded",
-                "message": f"今日免费次数已用完（{current_user.quota_total}次/天），请明日再试",
-                "message_en": f"Daily free limit reached ({current_user.quota_total}/day). Try again tomorrow."
-            }
-        )
-
-    platform = req.platform if req.platform in PROMPTS else "tradingview"
-    lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
-    system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
-
-    # 调用AI API
-    if MODEL_PROVIDER == "minimax":
-        api_url = MINIMAX_URL
-        api_key = MINIMAX_API_KEY
-        model = MINIMAX_MODEL
-
-        # MiniMax 官方视觉格式
-        payload = {
-            "model": model,
-            "max_tokens": 3000,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": f"[Image base64:{req.image_base64}]\n请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                }
-            ]
-        }
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-    else:
-        # DeepSeek (OpenAI兼容格式)
-        api_url = DEEPSEEK_URL
-        api_key = DEEPSEEK_API_KEY
-        model = DEEPSEEK_MODEL
-
-        payload = {
-            "model": model,
-            "max_tokens": 3000,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{req.image_base64}"}
-                        },
-                        {
-                            "type": "text",
-                            "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                        }
-                    ]
-                }
-            ]
-        }
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
+    print(f"📊 开始分析请求，用户: {current_user.id}, 平台: {req.platform}")
 
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(api_url, json=payload, headers=headers)
+        # 1. 检查并扣减配额（所有图片上传都消耗配额）
+        print("💰 检查并扣减配额")
+        quota_allowed, remaining = auth.check_and_increment_quota(db, current_user)
 
-            # 打印原始响应便于调试
-            print(f"HTTP状态码: {resp.status_code}")
-            try:
-                resp_preview = json.dumps(resp.json(), indent=2, ensure_ascii=False)[:800]
-                print(f"响应内容预览: {resp_preview}")
-            except Exception:
-                print(f"响应文本: {resp.text[:500]}")
+        if not quota_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "daily_limit_exceeded",
+                    "message": f"今日免费次数已用完（{current_user.quota_total}次/天），请明日再试",
+                    "message_en": f"Daily free limit reached ({current_user.quota_total}/day). Try again tomorrow."
+                }
+            )
 
-            resp.raise_for_status()
+        print(f"✅ 配额已扣减，剩余次数: {remaining}")
 
-            # OpenAI 兼容格式解析
-            raw = resp.json()["choices"][0]["message"]["content"]
-            print(f"🤖 AI原始响应 (前500字符): {raw[:500]}...")
-            print(f"🤖 AI原始响应长度: {len(raw)} 字符")
+        # 2. 第一阶段：图片验证
+        print("🔍 第一阶段：图片验证")
+        validation_result = await validate_image(req.image_base64, req.platform)
 
-        # 解析元数据
+        if not validation_result["valid"]:
+            # 验证失败，但配额已扣减
+            print(f"❌ 图片验证失败: {validation_result['reason']} (配额已消耗)")
+            raise InvalidImageError(
+                reason=f"{validation_result['reason']} (已消耗1次分析次数)",
+                reason_en=f"{validation_result['reason_en']} (1 analysis quota consumed)"
+            )
+
+        print(f"✅ 图片验证通过: {validation_result['metadata']}")
+
+        # 3. 第二阶段：完整分析
+        print("🔍 第二阶段：完整分析")
+        platform = req.platform if req.platform in PROMPTS else "tradingview"
+        lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
+        system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
+
+        # 使用通用的call_ai_api函数进行完整分析
+        raw = await call_ai_api(
+            image_base64=req.image_base64,
+            system_prompt=system_prompt,
+            max_tokens=3000,
+            temperature=0.7,
+            is_validation=False
+        )
+
+        # 4. 解析元数据
         meta = {}
         for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
             m = re.search(rf"{key}:(.+?)(?:\n|$)", raw)
@@ -489,14 +483,14 @@ async def analyze(
             else:
                 meta[key.lower()] = value
 
-        # 清理报告内容
+        # 5. 清理报告内容
         clean = re.sub(r"\n*---\s*\nMETADATA.*$", "", raw, flags=re.DOTALL).strip()
 
         print(f"📊 解析的元数据: {meta}")
         print(f"📊 原始报告内容长度: {len(raw)} 字符")
         print(f"📊 清理后报告内容长度: {len(clean)} 字符")
 
-        # 创建AnalysisMetadata实例
+        # 6. 创建AnalysisMetadata实例
         try:
             analysis_metadata = schemas.AnalysisMetadata(**meta)
             print(f"✅ 成功创建AnalysisMetadata: {analysis_metadata}")
@@ -507,10 +501,10 @@ async def analyze(
             analysis_metadata = schemas.AnalysisMetadata()
             print(f"✅ 使用默认AnalysisMetadata: {analysis_metadata}")
 
-        # 计算图片哈希
+        # 7. 计算图片哈希
         image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
 
-        # 保存分析记录到数据库
+        # 8. 保存分析记录到数据库
         db_record = models.AnalysisRecord(
             user_id=current_user.id,
             platform=platform,
@@ -528,32 +522,27 @@ async def analyze(
         db.commit()
         db.refresh(db_record)
 
-        # 增加用户配额使用
-        auth.increment_user_quota(db, current_user)
-
-        # 重新计算剩余次数
-        _, new_remaining = auth.check_user_quota(current_user)
+        print(f"✅ 分析完成，记录ID: {db_record.id}, 剩余次数: {remaining}")
 
         return schemas.AnalyzeResponse(
             report=clean,
             analysis_metadata=analysis_metadata,
-            remaining_today=new_remaining,
+            remaining_today=remaining,
             platform=platform,
             record_id=db_record.id
         )
 
-    except httpx.HTTPStatusError as e:
-        provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
-        error_body = e.response.text[:300]
-        print(f"{provider_name} API 错误 {e.response.status_code}: {error_body}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"{provider_name} API 错误: {e.response.status_code} - {error_body}"
-        )
+    except InvalidImageError:
+        # 无效图片错误，配额已扣减，直接抛出
+        print("⚠️ 无效图片错误（配额已扣减）")
+        raise
+    except HTTPException:
+        # 其他HTTP异常，直接抛出
+        raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"分析失败错误详情:\n{error_details}")
+        print(f"❌ 分析失败错误详情:\n{error_details}")
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
 
 
@@ -574,6 +563,147 @@ async def ask_question(
         current_user=current_user,
         db=db
     )
+
+
+async def validate_image(image_base64: str, platform: str) -> dict:
+    """验证图片是否符合K线图要求"""
+    print(f"🔍 开始验证图片，平台: {platform}")
+
+    # 调用AI进行验证（使用较小token限制）
+    validation_response = await call_ai_api(
+        image_base64=image_base64,
+        system_prompt=VALIDATION_PROMPT,
+        max_tokens=100,  # 限制token，快速响应
+        temperature=0.1,  # 低随机性，确保一致性
+        is_validation=True  # 标记为验证阶段
+    )
+
+    response_text = validation_response.strip()
+    print(f"🔍 验证响应: {response_text}")
+
+    # 解析响应
+    if response_text.startswith("VALID:"):
+        # 提取元数据
+        parts = response_text[6:].strip().split(" ", 2)
+        if len(parts) >= 3:
+            pair, timeframe, description = parts[0], parts[1], parts[2]
+        else:
+            pair, timeframe, description = "UNKNOWN", "UNKNOWN", response_text[6:].strip()
+
+        print(f"✅ 图片验证通过: pair={pair}, timeframe={timeframe}")
+        return {
+            "valid": True,
+            "metadata": {
+                "pair": pair,
+                "timeframe": timeframe,
+                "description": description
+            }
+        }
+    elif response_text.startswith("INVALID:"):
+        reason = response_text[8:].strip()
+        print(f"❌ 图片验证失败: {reason}")
+        return {
+            "valid": False,
+            "reason": reason,
+            "reason_en": reason  # 暂时使用相同文本，后续可以添加翻译
+        }
+    else:
+        # 无法解析响应，默认无效
+        print(f"⚠️ 无法解析验证响应: {response_text}")
+        return {
+            "valid": False,
+            "reason": "无法验证图片内容",
+            "reason_en": "Unable to validate image content"
+        }
+
+async def call_ai_api(image_base64: str, system_prompt: str, max_tokens: int = 3000,
+                     temperature: float = 0.7, is_validation: bool = False) -> str:
+    """调用AI API的通用函数，支持验证阶段和完整分析阶段"""
+    if MODEL_PROVIDER == "minimax":
+        api_url = MINIMAX_URL
+        api_key = MINIMAX_API_KEY
+        model = MINIMAX_MODEL
+
+        # MiniMax 官方视觉格式
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"[Image base64:{image_base64}]\n请分析这张图表截图。"
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    else:
+        # DeepSeek (OpenAI兼容格式)
+        api_url = DEEPSEEK_URL
+        api_key = DEEPSEEK_API_KEY
+        model = DEEPSEEK_MODEL
+
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"}
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图。"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(api_url, json=payload, headers=headers)
+
+            # 打印原始响应便于调试
+            print(f"🤖 AI API调用 ({'验证' if is_validation else '分析'}阶段) - HTTP状态码: {resp.status_code}")
+
+            resp.raise_for_status()
+
+            # OpenAI 兼容格式解析
+            raw = resp.json()["choices"][0]["message"]["content"]
+            print(f"🤖 AI响应 (前200字符): {raw[:200]}...")
+
+            return raw
+
+    except httpx.HTTPStatusError as e:
+        provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
+        error_body = e.response.text[:300]
+        print(f"❌ {provider_name} API 错误 {e.response.status_code}: {error_body}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"{provider_name} API 错误: {e.response.status_code} - {error_body}"
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ AI API调用失败: {error_details}")
+        raise HTTPException(status_code=500, detail=f"AI API调用失败: {str(e)}")
 
 
 # 中间件：记录API访问日志

@@ -167,6 +167,10 @@ class ApiClient {
     return this.request(`/analysis/${id}`)
   }
 
+  async getAnalysisImage(id) {
+    return this.request(`/analysis/${id}/image`)
+  }
+
   async analyzeImage(imageBase64, platform = "tradingview", lang = "zh") {
     // console.log('📸 提交图片分析请求')
     // console.log('平台:', platform)
