@@ -38,10 +38,6 @@ import schemas
 import auth
 from routers import auth as auth_router, analysis as analysis_router, conversation as conversation_router, oauth as oauth_router
 
-# 导入新的AI配置系统
-from ai.config.manager import ConfigManager
-from ai.validation.validator import ImageValidator
-
 # 创建数据库表
 models.Base.metadata.create_all(bind=engine)
 
@@ -162,19 +158,130 @@ DEEPSEEK_MODEL = "deepseek-chat"
 MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
 MINIMAX_MODEL = "MiniMax-Text-01"
 
-# 初始化配置管理器
-try:
-    config_manager = ConfigManager()
-    image_validator = ImageValidator(config_manager)
-    print("✅ AI配置系统初始化完成")
-except Exception as e:
-    print(f"❌ AI配置系统初始化失败: {e}")
-    # 使用默认配置继续运行
-    config_manager = None
-    image_validator = None
+# 验证提示词（第一阶段：快速验证）
+VALIDATION_PROMPT = """
+你是一个K线图表验证专家。请判断这张图片是否符合以下要求：
 
-# 提示词配置已迁移到外部文件
-# 使用 config_manager 加载提示词
+要求：
+1. 必须是金融交易图表（K线图、蜡烛图）
+2. 必须包含价格走势信息
+3. 必须能识别交易对（如BTC/USD, ETH/USD等）
+4. 必须能识别时间周期（如1h, 4h, 1d等）
+
+请只回答以下格式之一：
+VALID: [交易对] [时间周期] [简要描述]
+INVALID: [原因]
+
+示例：
+VALID: BTC/USD 4h 比特币4小时K线图，包含价格和成交量
+INVALID: 这不是金融图表，看起来是网页截图
+INVALID: 无法识别交易对和时间周期
+INVALID: 图片模糊无法识别
+"""
+
+# 分析提示词（第二阶段：完整分析）
+PROMPT_AGGR = """
+你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
+
+从截图识别以下指标：
+- 交易对、时间周期、当前价格
+- K线形态与趋势（上升/下降/横盘）
+- 清算热力图：密集色带 = 清算聚集位
+- 清算柱：紫色 = 多头清算，蓝色 = 空头清算
+- CVD曲线：上升 = 买方主导，下降 = 卖方主导；注意与价格背离
+- Delta柱（绿/红竖柱）：正值绿色 = 买方主动出击，负值红色 = 卖方主动出击；统计连续根数
+- 成交量：放量/缩量，与价格配合
+- VWAP：价格在其上方/下方
+- 1h副图（若存在）：仅K线+成交量，判断大级别趋势
+- 右侧REKTS：大额清算记录
+
+信号规则：
+- CVD + Delta 同向双重确认时重点标注
+- Delta 连续5根以上同向 = 强信号，标注根数
+- 1h 与主图共振：概率权重 +10~15%
+- 触发条件必须量化（具体价格 + K线确认根数）
+
+总结评级（基于最高概率场景）：
+- ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
+- ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
+- ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
+- <40%:  ⚫⚫⚫等待观望
+"""
+
+PROMPT_TV = """
+你是 Candlebot · K线专家，专门解读 TradingView 的行情截图，用小白也能看懂的语言输出分析报告。
+
+从截图识别以下指标：
+- 交易对、时间周期、当前价格
+- K线形态（头肩顶底、双顶双底、旗形、楔形、锤子线等）
+- 趋势线与通道方向
+- 均线系统（MA/EMA）：多空排列、金叉死叉
+- 成交量：放量/缩量，量价配合
+- RSI/MACD（若可见）：超买超卖、背离信号
+- 布林带（若可见）：价格位置、收窄扩张
+- 关键支撑阻力位
+
+信号规则：
+- 多指标共振 = 强信号
+- 成交量必须与价格方向配合
+- 触发条件必须量化（具体价格 + K线确认）
+
+总结评级（基于最高概率场景）：
+- ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
+- ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
+- ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
+- <40%:  ⚫⚫⚫等待观望
+"""
+
+PROMPTS = {"aggr": PROMPT_AGGR, "tradingview": PROMPT_TV}
+
+OUTPUT_FORMAT = """
+## 输出格式（严格遵循，Markdown）
+
+{交易对} · {时间周期} · ${价格}
+
+---
+
+## 📊 技术面信号
+
+| 指标 | 当前状态 | 信号 |
+|------|---------|------|
+| K线形态 | ... | 🔴/⚫/🟢 |
+| CVD | ... | 🔴/⚫/🟢 |
+| Delta | [数值+连续根数] | 🔴/⚫/🟢 |
+| 成交量 | ... | 🔴/⚫/🟢 |
+| VWAP | ... | 🔴/⚫/🟢 |
+| 关键支撑 | $X,XXX（原因） | — |
+| 关键阻力 | $X,XXX（原因） | — |
+
+---
+
+## 🎯 概率预测
+
+**场景A（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+**场景B（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+**场景C（X%）**：[方向] → 目标 $X,XXX
+触发条件：[量化条件]
+
+---
+
+## 总结
+
+[评级标签]：[100字以内，简洁直接]
+
+---
+METADATA
+RATING:[评级文字，如🟢🟢🟢做多良机]
+RATING_SCORE:[整数，-3到3]
+SUMMARY:[总结正文，不含评级标签，100字以内]
+PAIR:[交易对，如ETHUSD]
+PRICE:[当前价格数字]
+TIMEFRAME:[时间周期，如15m]
+"""
 
 
 @app.get("/")
@@ -344,33 +451,9 @@ async def analyze(
 
         # 3. 第二阶段：完整分析
         print("🔍 第二阶段：完整分析")
-        platform = req.platform
-
-        # 使用配置管理器获取提示词
-        if config_manager:
-            try:
-                # 检查平台是否支持
-                supported_platforms = config_manager.list_platforms()
-                if platform not in supported_platforms:
-                    print(f"⚠️ 平台 {platform} 不支持，使用默认平台: tradingview")
-                    platform = "tradingview"
-
-                # 获取组合提示词（平台提示词 + 输出格式 + 语言指令）
-                system_prompt = config_manager.get_combined_prompt(platform, req.lang)
-                print(f"✅ 使用配置管理器加载提示词，平台: {platform}, 语言: {req.lang}")
-
-            except Exception as e:
-                print(f"⚠️ 配置管理器加载提示词失败，使用旧逻辑: {e}")
-                # 回退到旧逻辑
-                platform = req.platform if req.platform in ["aggr", "tradingview"] else "tradingview"
-                lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
-                # 使用硬编码的提示词（从备份中获取）
-                system_prompt = _get_legacy_prompt(platform) + _get_legacy_output_format() + f"\n\n{lang_note}"
-        else:
-            # 配置管理器未初始化，使用旧逻辑
-            platform = req.platform if req.platform in ["aggr", "tradingview"] else "tradingview"
-            lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
-            system_prompt = _get_legacy_prompt(platform) + _get_legacy_output_format() + f"\n\n{lang_note}"
+        platform = req.platform if req.platform in PROMPTS else "tradingview"
+        lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
+        system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
 
         # 使用通用的call_ai_api函数进行完整分析
         raw = await call_ai_api(
@@ -486,44 +569,10 @@ async def validate_image(image_base64: str, platform: str) -> dict:
     """验证图片是否符合K线图要求"""
     print(f"🔍 开始验证图片，平台: {platform}")
 
-    # 使用新的图片验证器
-    if image_validator is None:
-        # 回退到旧的验证逻辑
-        return await _legacy_validate_image(image_base64, platform)
-
-    try:
-        # 使用默认语言（zh）进行验证
-        validation_result = await image_validator.validate(image_base64, platform, "zh")
-
-        if validation_result["valid"]:
-            print(f"✅ 图片验证通过: {validation_result['metadata']}")
-        else:
-            print(f"❌ 图片验证失败: {validation_result['reason']}")
-
-        return validation_result
-
-    except Exception as e:
-        print(f"⚠️ 新验证器失败，回退到旧逻辑: {e}")
-        return await _legacy_validate_image(image_base64, platform)
-
-
-async def _legacy_validate_image(image_base64: str, platform: str) -> dict:
-    """旧的验证逻辑（回退方案）"""
-    print(f"🔍 使用旧验证逻辑，平台: {platform}")
-
-    # 获取验证提示词
-    validation_prompt = "你是一个K线图表验证专家。请判断这张图片是否符合以下要求：\n\n要求：\n1. 必须是金融交易图表（K线图、蜡烛图）\n2. 必须包含价格走势信息\n3. 必须能识别交易对（如BTC/USD, ETH/USD等）\n4. 必须能识别时间周期（如1h, 4h, 1d等）\n\n请只回答以下格式之一：\nVALID: [交易对] [时间周期] [简要描述]\nINVALID: [原因]\n\n示例：\nVALID: BTC/USD 4h 比特币4小时K线图，包含价格和成交量\nINVALID: 这不是金融图表，看起来是网页截图\nINVALID: 无法识别交易对和时间周期\nINVALID: 图片模糊无法识别"
-
-    if config_manager:
-        try:
-            validation_prompt = config_manager.get_validation_prompt("zh")
-        except Exception as e:
-            print(f"⚠️ 获取验证提示词失败: {e}")
-
     # 调用AI进行验证（使用较小token限制）
     validation_response = await call_ai_api(
         image_base64=image_base64,
-        system_prompt=validation_prompt,
+        system_prompt=VALIDATION_PROMPT,
         max_tokens=100,  # 限制token，快速响应
         temperature=0.1,  # 低随机性，确保一致性
         is_validation=True  # 标记为验证阶段
@@ -671,161 +720,3 @@ async def log_requests(request: Request, call_next):
     print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}ms")
 
     return response
-
-
-@app.get("/debug/ai-config")
-async def debug_ai_config():
-    """调试端点：检查AI配置系统状态"""
-    try:
-        if config_manager is None:
-            return {
-                "status": "error",
-                "message": "配置管理器未初始化",
-                "config_system": "disabled"
-            }
-
-        # 获取支持的平台
-        platforms = config_manager.list_platforms()
-
-        # 获取各平台支持的语言
-        platform_languages = {}
-        for platform in platforms:
-            languages = config_manager.list_supported_languages("platforms", platform)
-            platform_languages[platform] = languages
-
-        # 获取验证配置
-        validation_config = config_manager.get_validation_config()
-
-        return {
-            "status": "ok",
-            "config_system": "enabled",
-            "base_path": str(config_manager.base_path),
-            "supported_platforms": platforms,
-            "platform_languages": platform_languages,
-            "validation_config": {
-                "size_validation": validation_config.size_validation,
-                "ai_validation": validation_config.ai_validation,
-                "reference_comparison": validation_config.reference_comparison
-            },
-            "cache_stats": {
-                "prompt_cache_size": len(config_manager.cache),
-                "config_cache_size": len(config_manager.config_cache)
-            }
-        }
-
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        return {
-            "status": "error",
-            "message": str(e),
-            "error_type": type(e).__name__,
-            "traceback": error_details
-        }
-
-
-# 辅助函数：获取旧的提示词（回退方案）
-def _get_legacy_prompt(platform: str) -> str:
-    """获取旧的平台提示词"""
-    prompts = {
-        "aggr": """你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
-
-从截图识别以下指标：
-- 交易对、时间周期、当前价格
-- K线形态与趋势（上升/下降/横盘）
-- 清算热力图：密集色带 = 清算聚集位
-- 清算柱：紫色 = 多头清算，蓝色 = 空头清算
-- CVD曲线：上升 = 买方主导，下降 = 卖方主导；注意与价格背离
-- Delta柱（绿/红竖柱）：正值绿色 = 买方主动出击，负值红色 = 卖方主动出击；统计连续根数
-- 成交量：放量/缩量，与价格配合
-- VWAP：价格在其上方/下方
-- 1h副图（若存在）：仅K线+成交量，判断大级别趋势
-- 右侧REKTS：大额清算记录
-
-信号规则：
-- CVD + Delta 同向双重确认时重点标注
-- Delta 连续5根以上同向 = 强信号，标注根数
-- 1h 与主图共振：概率权重 +10~15%
-- 触发条件必须量化（具体价格 + K线确认根数）
-
-总结评级（基于最高概率场景）：
-- ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
-- ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
-- ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
-- <40%:  ⚫⚫⚫等待观望""",
-
-        "tradingview": """你是 Candlebot · K线专家，专门解读 TradingView 的行情截图，用小白也能看懂的语言输出分析报告。
-
-从截图识别以下指标：
-- 交易对、时间周期、当前价格
-- K线形态（头肩顶底、双顶双底、旗形、楔形、锤子线等）
-- 趋势线与通道方向
-- 均线系统（MA/EMA）：多空排列、金叉死叉
-- 成交量：放量/缩量，量价配合
-- RSI/MACD（若可见）：超买超卖、背离信号
-- 布林带（若可见）：价格位置、收窄扩张
-- 关键支撑阻力位
-
-信号规则：
-- 多指标共振 = 强信号
-- 成交量必须与价格方向配合
-- 触发条件必须量化（具体价格 + K线确认）
-
-总结评级（基于最高概率场景）：
-- ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
-- ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
-- ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
-- <40%:  ⚫⚫⚫等待观望"""
-    }
-    return prompts.get(platform, prompts["tradingview"])
-
-
-def _get_legacy_output_format() -> str:
-    """获取旧的输出格式"""
-    return """
-## 输出格式（严格遵循，Markdown）
-
-{交易对} · {时间周期} · ${价格}
-
----
-
-## 📊 技术面信号
-
-| 指标 | 当前状态 | 信号 |
-|------|---------|------|
-| K线形态 | ... | 🔴/⚫/🟢 |
-| CVD | ... | 🔴/⚫/🟢 |
-| Delta | [数值+连续根数] | 🔴/⚫/🟢 |
-| 成交量 | ... | 🔴/⚫/🟢 |
-| VWAP | ... | 🔴/⚫/🟢 |
-| 关键支撑 | $X,XXX（原因） | — |
-| 关键阻力 | $X,XXX（原因） | — |
-
----
-
-## 🎯 概率预测
-
-**场景A（X%）**：[方向] → 目标 $X,XXX
-触发条件：[量化条件]
-
-**场景B（X%）**：[方向] → 目标 $X,XXX
-触发条件：[量化条件]
-
-**场景C（X%）**：[方向] → 目标 $X,XXX
-触发条件：[量化条件]
-
----
-
-## 总结
-
-[评级标签]：[100字以内，简洁直接]
-
----
-METADATA
-RATING:[评级文字，如🟢🟢🟢做多良机]
-RATING_SCORE:[整数，-3到3]
-SUMMARY:[总结正文，不含评级标签，100字以内]
-PAIR:[交易对，如ETHUSD]
-PRICE:[当前价格数字]
-TIMEFRAME:[时间周期，如15m]
-"""

@@ -10,3 +10,8 @@ psycopg2-binary>=2.9.0
 alembic>=1.12.0
 python-dotenv>=1.0.0
 email-validator>=2.0.0
+
+# 可选：图片处理依赖（用于增强的图片验证功能）
+# Pillow>=10.0.0  # 取消注释以启用图片尺寸检查
+# opencv-python-headless>=4.8.0  # 取消注释以启用图片相似度比较
+# numpy>=1.24.0  # 取消注释以启用数值计算

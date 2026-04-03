@@ -1,0 +1,16 @@
+{
+  "size_validation": {
+    "min_width": 600,
+    "min_height": 400,
+    "max_size_mb": 5
+  },
+  "ai_validation": {
+    "max_tokens": 100,
+    "temperature": 0.1
+  },
+  "reference_comparison": {
+    "enabled": true,
+    "threshold": 0.7,
+    "platforms": ["aggr", "tradingview"]
+  }
+}

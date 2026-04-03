@@ -1,0 +1,11 @@
+{
+  "name": "aggr.trade",
+  "description": "Aggr.trade交易平台",
+  "supported_languages": ["zh", "en"],
+  "features": ["清算热力图", "CVD曲线", "Delta柱"],
+  "validation_requirements": {
+    "min_width": 600,
+    "aspect_ratio": [1.5, 2.5],
+    "required_elements": ["K线图", "价格轴", "时间轴"]
+  }
+}

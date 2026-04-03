@@ -1,0 +1,5 @@
+{
+  "name": "output_format",
+  "description": "输出格式模板",
+  "supported_languages": ["zh", "en"]
+}

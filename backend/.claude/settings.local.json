@@ -10,7 +10,12 @@
       "Bash(source venv/bin/activate && python --version)",
       "Bash(curl -s http://localhost:8000/docs | head -20)",
       "Bash(python3 -c \"import httpx; print\\('httpx version:', httpx.__version__\\)\")",
-      "Bash(/Users/free/Projects/candlebot/backend/venv/bin/python -c \"import httpx; print\\('httpx version:', httpx.__version__\\)\")"
+      "Bash(/Users/free/Projects/candlebot/backend/venv/bin/python -c \"import httpx; print\\('httpx version:', httpx.__version__\\)\")",
+      "Bash(python test_config_system.py)",
+      "Bash(python3 test_config_system.py)",
+      "Bash(python3 -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom main import app, config_manager, image_validator\nprint\\('✅ 主应用导入成功'\\)\nprint\\(f'✅ 配置管理器: {config_manager}'\\)\nprint\\(f'✅ 图片验证器: {image_validator}'\\)\n\")",
+      "Bash(source venv/bin/activate && python3 -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom main import app, config_manager, image_validator\nprint\\('✅ 主应用导入成功'\\)\nprint\\(f'✅ 配置管理器: {config_manager}'\\)\nprint\\(f'✅ 图片验证器: {image_validator}'\\)\n\")",
+      "Bash(source venv/bin/activate && python3 -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom main import app\nprint\\('✅ FastAPI应用创建成功'\\)\nprint\\(f'✅ 应用标题: {app.title}'\\)\nprint\\(f'✅ 应用版本: {app.version}'\\)\n\")"
     ]
   }
 }
