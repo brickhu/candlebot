@@ -24,7 +24,8 @@
       "Bash(python3 -c \"\nimport sys\nsys.path.append\\('.'\\)\nfrom main import config_manager, image_validator\nprint\\(f'config_manager: {config_manager}'\\)\nprint\\(f'image_validator: {image_validator}'\\)\n\")",
       "Bash(pip list:*)",
       "Bash(pip3 list:*)",
-      "Bash(python3 test_base64_cleaning.py)"
+      "Bash(python3 test_base64_cleaning.py)",
+      "Bash(python3 test_real_scenario.py)"
     ]
   }
 }

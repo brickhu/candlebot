@@ -330,6 +330,22 @@ async def analyze(
 
         # 2. 第一阶段：图片验证
         print("🔍 第一阶段：图片验证")
+
+        # 调试：记录接收到的图片数据信息
+        image_data = req.image_base64
+        print(f"🔍 接收到的图片数据长度: {len(image_data)} 字符")
+        if len(image_data) > 100:
+            print(f"🔍 图片数据前100字符: {image_data[:100]}...")
+            print(f"🔍 图片数据后50字符: ...{image_data[-50:]}")
+        else:
+            print(f"🔍 图片数据内容: {image_data}")
+
+        # 检查是否可能是数据URL
+        if image_data.startswith('data:'):
+            print(f"🔍 检测到数据URL格式")
+            if ';base64,' in image_data:
+                print(f"🔍 包含base64前缀")
+
         validation_result = await validate_image(req.image_base64, req.platform)
 
         if not validation_result["valid"]:

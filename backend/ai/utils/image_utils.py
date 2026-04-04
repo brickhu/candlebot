@@ -74,18 +74,31 @@ class ImageUtils:
     @staticmethod
     def validate_image_format(image_base64: str) -> bool:
         """验证图片格式"""
+        print(f"🔍 开始验证图片格式，输入长度: {len(image_base64)} 字符")
+
+        # 记录前100个字符用于调试
+        if len(image_base64) > 100:
+            print(f"🔍 输入前100字符: {image_base64[:100]}...")
+        else:
+            print(f"🔍 输入内容: {image_base64}")
+
         try:
             # 清理base64字符串（移除换行符、空格等）
             cleaned_base64 = image_base64.strip()
             # 移除可能的数据URL前缀
             if cleaned_base64.startswith('data:image/'):
+                print(f"🔍 检测到数据URL格式")
                 # 提取base64部分（data:image/png;base64,actual_base64_data）
                 parts = cleaned_base64.split(',', 1)
                 if len(parts) == 2:
                     cleaned_base64 = parts[1]
+                    print(f"🔍 提取base64部分，长度: {len(cleaned_base64)}")
 
             # 移除所有空白字符
+            original_length = len(cleaned_base64)
             cleaned_base64 = ''.join(cleaned_base64.split())
+            if original_length != len(cleaned_base64):
+                print(f"🔍 移除了 {original_length - len(cleaned_base64)} 个空白字符")
 
             print(f"🔍 清理后base64长度: {len(cleaned_base64)} 字符")
 
