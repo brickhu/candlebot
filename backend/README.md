@@ -125,6 +125,25 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+### 图片数据迁移到对象存储
+
+当启用对象存储后，可以使用迁移脚本将现有的base64图片迁移到对象存储：
+
+```bash
+# 先确保对象存储配置正确
+# 检查配置
+curl http://localhost:8000/debug/storage
+
+# 执行迁移（干运行模式，只显示要迁移的记录）
+python migrate_images_to_object_storage.py --dry-run --limit 10
+
+# 实际执行迁移
+python migrate_images_to_object_storage.py --limit 100
+
+# 指定数据库URL
+python migrate_images_to_object_storage.py --database-url "postgresql://..." --limit 50
+```
+
 ## 部署
 
 ### Docker部署
@@ -152,6 +171,7 @@ docker run -p 8000:8000 \
 
 ## 环境变量
 
+### 基础配置
 | 变量名 | 描述 | 默认值 |
 |--------|------|--------|
 | DATABASE_URL | PostgreSQL连接URL | postgresql://postgres:postgres@localhost:5432/candlebot |
@@ -162,6 +182,27 @@ docker run -p 8000:8000 \
 | ACCESS_TOKEN_EXPIRE_MINUTES | JWT过期时间(分钟) | 10080 (7天) |
 | DEFAULT_FREE_QUOTA | 免费用户配额 | 5 |
 | PREMIUM_QUOTA | 付费用户配额 | 100 |
+
+### 对象存储配置（Railway S3兼容）
+| 变量名 | 描述 | 默认值 |
+|--------|------|--------|
+| AWS_ACCESS_KEY_ID | Railway S3访问密钥ID | - |
+| AWS_SECRET_ACCESS_KEY | Railway S3秘密访问密钥 | - |
+| AWS_REGION | S3区域 | auto |
+| S3_BUCKET | S3存储桶名称 | - |
+| S3_ENDPOINT_URL | S3端点URL | - |
+| S3_PUBLIC_URL_PREFIX | 公开访问URL前缀（可选） | - |
+| IMAGE_STORAGE_TYPE | 图片存储类型 (database/object_storage) | database |
+| IMAGE_MAX_SIZE_MB | 最大图片大小（MB） | 10 |
+
+### Railway对象存储配置步骤
+1. 在Railway项目中添加"Storage"插件
+2. 获取以下配置信息：
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `S3_BUCKET`
+   - `S3_ENDPOINT_URL`
+3. 设置 `IMAGE_STORAGE_TYPE=object_storage` 启用对象存储
 
 ## 测试
 

@@ -25,7 +25,10 @@
       "Bash(pip list:*)",
       "Bash(pip3 list:*)",
       "Bash(python3 test_base64_cleaning.py)",
-      "Bash(python3 test_real_scenario.py)"
+      "Bash(python3 test_real_scenario.py)",
+      "Bash(python -m py_compile storage.py)",
+      "Bash(python3 -m py_compile storage.py)",
+      "Bash(/opt/homebrew/bin/python3 -m py_compile storage.py)"
     ]
   }
 }

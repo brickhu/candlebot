@@ -42,6 +42,9 @@ from routers import auth as auth_router, analysis as analysis_router, conversati
 from ai.config.manager import ConfigManager
 from ai.validation.validator import ImageValidator
 
+# 导入对象存储模块
+from storage import storage_service, storage_config
+
 # 创建数据库表
 models.Base.metadata.create_all(bind=engine)
 
@@ -437,12 +440,33 @@ async def analyze(
         # 7. 计算图片哈希
         image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
 
-        # 8. 保存分析记录到数据库
+        # 8. 保存图片到对象存储或数据库
+        image_storage_data = req.image_base64  # 默认使用base64
+
+        if storage_config.is_enabled():
+            try:
+                print(f"📤 尝试上传图片到对象存储，用户ID: {current_user.id}")
+                # 上传到对象存储
+                image_url = storage_service.upload_image(
+                    user_id=current_user.id,
+                    image_hash=image_hash,
+                    image_base64=req.image_base64
+                )
+                image_storage_data = image_url
+                print(f"✅ 图片已上传到对象存储: {image_url}")
+            except Exception as e:
+                print(f"⚠️ 对象存储上传失败，回退到数据库存储: {e}")
+                # 上传失败，回退到数据库存储
+                image_storage_data = req.image_base64
+        else:
+            print(f"ℹ️ 对象存储未启用，使用数据库存储")
+
+        # 9. 保存分析记录到数据库
         db_record = models.AnalysisRecord(
             user_id=current_user.id,
             platform=platform,
             image_hash=image_hash,
-            image_data=req.image_base64,  # 可选：保存图片数据
+            image_data=image_storage_data,  # 存储base64或对象存储URL
             report_data={
                 "report": clean,
                 "raw": raw,
@@ -726,6 +750,54 @@ async def debug_ai_config():
             "cache_stats": {
                 "prompt_cache_size": len(config_manager.cache),
                 "config_cache_size": len(config_manager.config_cache)
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return {
+            "status": "error",
+            "message": str(e),
+            "error_type": type(e).__name__,
+            "traceback": error_details
+        }
+
+
+@app.get("/debug/storage")
+async def debug_storage():
+    """调试端点：检查对象存储状态"""
+    try:
+        # 检查配置
+        is_enabled = storage_config.is_enabled()
+        config_valid, config_error = storage_config.validate()
+
+        config_info = {
+            "enabled": is_enabled,
+            "config_valid": config_valid,
+            "config_error": config_error,
+            "storage_type": storage_config.storage_type,
+            "max_image_size_mb": storage_config.max_image_size_mb,
+            "bucket": storage_config.bucket,
+            "endpoint_url": storage_config.endpoint_url,
+            "public_url_prefix": storage_config.public_url_prefix,
+            "region": storage_config.region,
+            "access_key_id_set": bool(storage_config.access_key_id),
+            "secret_access_key_set": bool(storage_config.secret_access_key)
+        }
+
+        # 测试连接（如果已启用）
+        connection_ok = False
+        connection_error = None
+        if is_enabled and config_valid:
+            connection_ok, connection_error = storage_service.test_connection()
+
+        return {
+            "status": "ok",
+            "storage": {
+                **config_info,
+                "connection_ok": connection_ok,
+                "connection_error": connection_error
             }
         }
 

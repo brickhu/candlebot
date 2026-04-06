@@ -44,7 +44,7 @@ class AnalysisRecord(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     platform = Column(String(50), nullable=False)  # aggr/tradingview
     image_hash = Column(String(64))  # 图片哈希（去重）
-    image_data = Column(Text)        # base64编码的图片（可选存储）
+    image_data = Column(Text)        # 图片数据：base64编码或对象存储URL
     report_data = Column(JSON, nullable=False)  # 完整的报告数据
     analysis_metadata = Column(JSON, nullable=False)     # 元数据：rating, pair, price等
     visibility = deferred(Column(String(20), default="private", nullable=True))   # 可见性：private/public

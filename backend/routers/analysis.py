@@ -8,6 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, text
 
+# 导入对象存储模块
+from storage import storage_service, storage_config
+
 def parse_json_field(value: Any) -> dict:
     """解析JSON字段，处理字符串或字典类型"""
     if value is None:
@@ -392,8 +395,16 @@ async def get_analysis_image(
             detail="该记录没有保存图片"
         )
 
-    # 返回base64编码的图片
-    return {"image_data": record.image_data}
+    # 检查是否是对象存储URL
+    image_data = record.image_data
+    if isinstance(image_data, str) and image_data.startswith('http'):
+        # 如果是对象存储URL，直接返回URL
+        # 注意：这里假设对象存储的URL是公开可访问的
+        # 如果需要私有访问，可以生成预签名URL
+        return {"image_url": image_data, "storage_type": "object_storage"}
+    else:
+        # 否则是base64数据
+        return {"image_data": image_data, "storage_type": "database"}
 
 
 @router.put("/{record_id}/visibility", response_model=schemas.SuccessResponse)

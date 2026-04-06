@@ -200,7 +200,7 @@ export default function NewPage() {
       </div>
 
       <div className='flex items-center gap-8'>
-        <button className='btn-accent' onClick={navigate(-1)} disabled={isSubmitting()}>Cancel</button>
+        <button className='btn-accent' onClick={() => navigate(-1)} disabled={isSubmitting()}>Cancel</button>
         <button className='btn btn-primary' onClick={handleSubmit} disabled={isSubmitting()}>{isSubmitting()?"Submiting":"Submit"}</button>
       </div>
     </div>
