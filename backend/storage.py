@@ -51,9 +51,9 @@ class ObjectStorageConfig:
         if not self.secret_access_key:
             missing.append("AWS_SECRET_ACCESS_KEY")
         if not self.bucket:
-            missing.append("S3_BUCKET")
+            missing.append("AWS_S3_BUCKET_NAME")
         if not self.endpoint_url:
-            missing.append("S3_ENDPOINT_URL")
+            missing.append("AWS_ENDPOINT_URL")
 
         if missing:
             return False, f"缺少必要的环境变量: {', '.join(missing)}"
