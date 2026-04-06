@@ -20,9 +20,9 @@ class ObjectStorageConfig:
     def __init__(self):
         self.access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
         self.secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        self.region = os.getenv("AWS_REGION", "auto")
-        self.bucket = os.getenv("S3_BUCKET")
-        self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
+        self.region = os.getenv("AWS_DEFAULT_REGION", "auto")
+        self.bucket = os.getenv("AWS_S3_BUCKET_NAME")
+        self.endpoint_url = os.getenv("AWS_ENDPOINT_URL")
         self.public_url_prefix = os.getenv("S3_PUBLIC_URL_PREFIX")
 
         # 图片存储类型：database 或 object_storage
