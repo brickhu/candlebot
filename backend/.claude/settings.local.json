@@ -28,7 +28,8 @@
       "Bash(python3 test_real_scenario.py)",
       "Bash(python -m py_compile storage.py)",
       "Bash(python3 -m py_compile storage.py)",
-      "Bash(/opt/homebrew/bin/python3 -m py_compile storage.py)"
+      "Bash(/opt/homebrew/bin/python3 -m py_compile storage.py)",
+      "Bash(ls -la *.md)"
     ]
   }
 }

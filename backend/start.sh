@@ -59,50 +59,35 @@ if [ -f "alembic.ini" ]; then
     alembic upgrade head
 fi
 
-# 运行数据库迁移脚本
-echo "运行数据库迁移脚本..."
-if [ -f "migrate_postgres.py" ]; then
-    python migrate_postgres.py
-elif [ -f "simple_migration.py" ]; then
-    python simple_migration.py
-else
-    echo "⚠️  未找到数据库迁移脚本"
-fi
+# 检查数据库表结构
+echo "检查数据库表结构..."
+python -c "
+import os
+import sys
+from sqlalchemy import create_engine, text, inspect
 
-# 运行新的迁移管理系统
-echo "运行迁移管理系统..."
-if [ -f "migration_manager.py" ]; then
-    echo "检查待处理迁移..."
-    python migration_manager.py --action pending
+DATABASE_URL = os.getenv('DATABASE_URL')
+try:
+    engine = create_engine(DATABASE_URL)
+    inspector = inspect(engine)
 
-    echo "应用所有待处理迁移..."
-    python migration_manager.py --action run-all
+    # 检查必要的表
+    required_tables = ['users', 'analysis_records', 'conversations']
+    missing_tables = []
 
-    echo "验证迁移完整性..."
-    python migration_manager.py --action validate
-else
-    echo "⚠️  未找到迁移管理工具"
-fi
+    for table in required_tables:
+        if not inspector.has_table(table):
+            missing_tables.append(table)
 
-# 运行数据验证和修复
-echo "运行数据验证和修复..."
-if [ -f "data_validator.py" ]; then
-    echo "验证数据完整性..."
-    python data_validator.py --report-only
+    if missing_tables:
+        print(f'⚠️  缺少必要的表: {missing_tables}')
+        print('   请运行数据库迁移或手动创建表')
+    else:
+        print('✅ 所有必要的表都存在')
 
-    echo "执行紧急修复..."
-    python emergency_fix.py --no-backup
-else
-    echo "⚠️  未找到数据验证工具"
-fi
-
-# 确保 visibility 字段存在（Railway 环境特别需要）
-echo "确保 visibility 字段存在..."
-if [ -f "fix_visibility_now.py" ]; then
-    python fix_visibility_now.py
-else
-    echo "⚠️  未找到 visibility 修复脚本"
-fi
+except Exception as e:
+    print(f'⚠️  检查数据库表结构失败: {e}')
+"
 
 # 启动服务
 echo "启动 FastAPI 服务..."
