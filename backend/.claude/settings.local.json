@@ -29,7 +29,10 @@
       "Bash(python -m py_compile storage.py)",
       "Bash(python3 -m py_compile storage.py)",
       "Bash(/opt/homebrew/bin/python3 -m py_compile storage.py)",
-      "Bash(ls -la *.md)"
+      "Bash(ls -la *.md)",
+      "Bash(python test_prompt_improvements.py)",
+      "Bash(python3 test_prompt_improvements.py)",
+      "Bash(python3 test_combined_format.py)"
     ]
   }
 }

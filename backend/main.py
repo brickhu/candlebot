@@ -374,9 +374,10 @@ async def analyze(
                     print(f"⚠️ 平台 {platform} 不支持，使用默认平台: tradingview")
                     platform = "tradingview"
 
-                # 获取组合提示词（平台提示词 + 输出格式 + 语言指令）
-                system_prompt = config_manager.get_combined_prompt(platform, req.lang)
-                print(f"✅ 使用配置管理器加载提示词，平台: {platform}, 语言: {req.lang}")
+                # 获取增强版提示词（包含示例参考）
+                system_prompt = config_manager.get_enhanced_prompt(platform, req.lang)
+                print(f"✅ 使用配置管理器加载增强提示词，平台: {platform}, 语言: {req.lang}")
+                print(f"📊 提示词长度: {len(system_prompt)} 字符")
 
             except Exception as e:
                 print(f"⚠️ 配置管理器加载提示词失败，使用旧逻辑: {e}")

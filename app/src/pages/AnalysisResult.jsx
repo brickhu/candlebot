@@ -30,7 +30,7 @@ export default props => {
     const response = await api.getAnalysisImage(id)
     console.log('图片相应: ', response);
     if(response?.success){
-      return response?.data?.image_data
+      return response?.data?.image_url || response?.data?.image_data
     }else{
       throw response?.error
     }

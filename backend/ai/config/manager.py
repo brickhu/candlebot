@@ -159,6 +159,11 @@ class ConfigManager:
         self.config_cache[cache_key] = config
         return config
 
+    def get_enhanced_prompt(self, platform: str, lang: str = "zh") -> str:
+        """获取增强版提示词（输出格式已包含示例）"""
+        # 直接使用组合提示词，因为输出格式已经包含了完整的示例
+        return self.get_combined_prompt(platform, lang)
+
     def list_platforms(self) -> List[str]:
         """列出所有支持的平台"""
         platforms_dir = self.base_path / "platforms"
