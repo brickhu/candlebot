@@ -42,6 +42,9 @@ from routers import auth as auth_router, analysis as analysis_router, conversati
 from ai.config.manager import ConfigManager
 from ai.validation.validator import ImageValidator
 
+# 导入简化的提示词管理器
+from ai.prompt_manager import get_prompt_manager
+
 # 导入对象存储模块
 from storage import storage_service, storage_config
 
@@ -126,11 +129,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 启动事件：初始化提示词管理器
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化提示词管理器"""
+    try:
+        prompt_manager = get_prompt_manager()
+        platforms = prompt_manager.list_platforms()
+        print(f"✅ 提示词管理器初始化完成，支持 {len(platforms)} 个平台: {platforms}")
+    except Exception as e:
+        print(f"❌ 提示词管理器初始化异常: {e}")
+
+# 导入管理路由
+from routers import admin as admin_router
+
 # 包含路由
 app.include_router(auth_router.router)
 app.include_router(analysis_router.router)
 app.include_router(conversation_router.router)
 app.include_router(oauth_router.router)
+app.include_router(admin_router.router)
 
 # 环境变量配置
 def load_env_from_file():
@@ -154,16 +172,20 @@ env_from_file = load_env_from_file()
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", env_from_file.get("MODEL_PROVIDER", "deepseek"))
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", env_from_file.get("DEEPSEEK_API_KEY", ""))
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", env_from_file.get("MINIMAX_API_KEY", ""))
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", env_from_file.get("QWEN_API_KEY", ""))
 
 print(f"MODEL_PROVIDER: {MODEL_PROVIDER}")
 print(f"MINIMAX_API_KEY长度: {len(MINIMAX_API_KEY) if MINIMAX_API_KEY else 0}")
 print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 0}")
+print(f"QWEN_API_KEY长度: {len(QWEN_API_KEY) if QWEN_API_KEY else 0}")
 
 # API 端点配置
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
 MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
 MINIMAX_MODEL = "MiniMax-Text-01"
+QWEN_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+QWEN_MODEL = "qwen-plus"
 
 # 初始化配置管理器
 try:
@@ -175,6 +197,9 @@ except Exception as e:
     # 使用默认配置继续运行
     config_manager = None
     image_validator = None
+
+# 初始化提示词管理器
+prompt_manager = get_prompt_manager()
 
 # 提示词配置已迁移到外部文件
 # 使用 config_manager 加载提示词
@@ -199,10 +224,17 @@ async def root():
 @app.get("/health")
 async def health():
     """健康检查端点"""
+    model_map = {
+        "minimax": MINIMAX_MODEL,
+        "deepseek": DEEPSEEK_MODEL,
+        "qwen": QWEN_MODEL
+    }
+    model = model_map.get(MODEL_PROVIDER, DEEPSEEK_MODEL)
+
     return {
         "status": "ok",
         "provider": MODEL_PROVIDER,
-        "model": MINIMAX_MODEL if MODEL_PROVIDER == "minimax" else DEEPSEEK_MODEL,
+        "model": model,
         "database": "connected",
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -635,6 +667,39 @@ async def call_ai_api(image_base64: str, system_prompt: str, max_tokens: int = 3
             "Content-Type": "application/json"
         }
 
+    elif MODEL_PROVIDER == "qwen":
+        api_url = QWEN_URL
+        api_key = QWEN_API_KEY
+        model = QWEN_MODEL
+
+        # Qwen (OpenAI兼容格式，支持视觉)
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"}
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图。"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
     else:
         # DeepSeek (OpenAI兼容格式)
         api_url = DEEPSEEK_URL
@@ -684,7 +749,12 @@ async def call_ai_api(image_base64: str, system_prompt: str, max_tokens: int = 3
             return raw
 
     except httpx.HTTPStatusError as e:
-        provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
+        provider_map = {
+            "minimax": "Minimax",
+            "qwen": "Qwen",
+            "deepseek": "DeepSeek"
+        }
+        provider_name = provider_map.get(MODEL_PROVIDER, "DeepSeek")
         error_body = e.response.text[:300]
         print(f"❌ {provider_name} API 错误 {e.response.status_code}: {error_body}")
         raise HTTPException(
@@ -918,3 +988,8 @@ PAIR:[交易对，如ETHUSD]
 PRICE:[当前价格数字]
 TIMEFRAME:[时间周期，如15m]
 """
+
+
+# ============================================================================
+# 提示词管理API端点
+# ============================================================================

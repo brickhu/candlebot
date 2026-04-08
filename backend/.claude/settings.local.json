@@ -32,7 +32,15 @@
       "Bash(ls -la *.md)",
       "Bash(python test_prompt_improvements.py)",
       "Bash(python3 test_prompt_improvements.py)",
-      "Bash(python3 test_combined_format.py)"
+      "Bash(python3 test_combined_format.py)",
+      "Bash(find /Users/free/Projects/candlebot/backend -type f -name \"*.py\" -exec grep -l \"skill\\\\|Skill\" {} \\\\; | head -10)",
+      "Bash(find /Users/free/Projects/candlebot/backend/ai -name \"*.json\" -type f | xargs ls -la)",
+      "Bash(python3 test_skill_system.py)",
+      "Bash(python test_simple.py)",
+      "Bash(find . -name \"__pycache__\" -type d -exec rm -rf {} + 2>/dev/null || true)",
+      "Bash(python3 -c \"from routers import admin; print\\('✅ admin路由导入成功'\\)\")",
+      "Bash(python3 -m py_compile routers/admin.py && echo \"✅ admin.py语法正确\")",
+      "Bash(find . -name \"*skill*\" -type d 2>/dev/null | grep -v \".claude\" | grep -v \"venv\")"
     ]
   }
 }
