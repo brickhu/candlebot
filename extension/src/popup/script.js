@@ -47,6 +47,9 @@ const elements = {
     environmentSelect: document.getElementById('environmentSelect'),
     testConnectionBtn: document.getElementById('testConnectionBtn'),
     clearDataBtn: document.getElementById('clearDataBtn'),
+    authTokenInput: document.getElementById('authTokenInput'),
+    saveAuthBtn: document.getElementById('saveAuthBtn'),
+    clearAuthBtn: document.getElementById('clearAuthBtn'),
 
     // 链接
     openDashboard: document.getElementById('openDashboard'),
@@ -70,6 +73,9 @@ async function initializePopup() {
 
     // 获取当前标签页信息
     await getCurrentTabInfo();
+
+    // 加载认证 token 状态
+    await loadAuthToken();
 
     // 设置事件监听器
     setupEventListeners();
@@ -170,6 +176,8 @@ function setupEventListeners() {
     elements.environmentSelect.addEventListener('change', handleEnvironmentChange);
     elements.testConnectionBtn.addEventListener('click', handleTestConnection);
     elements.clearDataBtn.addEventListener('click', handleClearData);
+    elements.saveAuthBtn.addEventListener('click', handleSaveAuthToken);
+    elements.clearAuthBtn.addEventListener('click', handleClearAuthToken);
 
     // 链接
     elements.openDashboard.addEventListener('click', (e) => {
@@ -601,6 +609,70 @@ async function handleClearData() {
 
     } catch (error) {
         showNotification('错误', '清理数据失败', 'error');
+    }
+}
+
+/**
+ * 处理保存认证 token
+ */
+async function handleSaveAuthToken() {
+    const token = elements.authTokenInput.value.trim();
+    if (!token) {
+        showNotification('提示', '请输入认证 Token', 'warning');
+        return;
+    }
+
+    try {
+        const response = await sendMessageToBackground({
+            type: 'SET_AUTH_TOKEN',
+            token: token
+        });
+
+        if (response?.success) {
+            showNotification('成功', '认证 Token 已保存', 'success');
+        } else {
+            showNotification('失败', response?.error || '保存失败', 'error');
+        }
+    } catch (error) {
+        showNotification('错误', error.message, 'error');
+    }
+}
+
+/**
+ * 处理清除认证 token
+ */
+async function handleClearAuthToken() {
+    try {
+        const response = await sendMessageToBackground('CLEAR_AUTH_TOKEN');
+
+        if (response?.success) {
+            elements.authTokenInput.value = '';
+            elements.authTokenInput.placeholder = '登录网页版后自动同步';
+            elements.authTokenInput.title = '';
+            showNotification('已清除', '认证 Token 已清除', 'success');
+        } else {
+            showNotification('失败', response?.error || '清除失败', 'error');
+        }
+    } catch (error) {
+        showNotification('错误', error.message, 'error');
+    }
+}
+
+/**
+ * 加载认证 token
+ */
+async function loadAuthToken() {
+    try {
+        const response = await sendMessageToBackground('GET_AUTH_TOKEN');
+        if (response?.success && response.hasToken) {
+            // 只显示是否有 token，不显示具体值（安全考虑）
+            elements.authTokenInput.placeholder = '已设置 Token (点击查看说明)';
+            elements.authTokenInput.title = 'Token 已存在，如有问题可重新设置';
+        } else {
+            elements.authTokenInput.placeholder = '登录网页版后自动同步';
+        }
+    } catch (error) {
+        console.error('加载 token 失败:', error);
     }
 }
 

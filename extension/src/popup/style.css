@@ -472,6 +472,40 @@ body {
     border-color: var(--primary-color);
 }
 
+.text-input {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: white;
+    color: var(--text-primary);
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    max-width: 160px;
+    font-family: var(--font-mono);
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.text-input::placeholder {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.setting-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.setting-actions .btn-small {
+    font-size: 11px;
+    padding: 4px 8px;
+}
+
 /* 底部 */
 .footer {
     display: flex;

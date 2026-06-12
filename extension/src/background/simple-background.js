@@ -1158,6 +1158,48 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
       break;
 
+    // ========== 浮动组件消息处理 ==========
+
+    case 'CAPTURE_SCREENSHOT_CHART':
+      // 浮动组件：截图当前可见标签页
+      handleBgCaptureScreenshot().then(sendResponse);
+      return true;
+
+    case 'EXTRACT_CHART_INFO_FROM_TAB':
+      // 浮动组件：提取当前标签页的图表信息
+      handleBgExtractChartInfo().then(sendResponse);
+      return true;
+
+    case 'ANALYZE_IMAGE_FROM_BG':
+      // 浮动组件：发送图片分析请求到后端
+      handleBgAnalyzeImage(message.imageBase64, message.platform, message.lang, message.chartInfo).then(sendResponse);
+      return true;
+
+    case 'ASK_FOLLOW_UP':
+      // 浮动组件：追问
+      handleBgAskFollowUp(message.analysisId, message.question, message.chartInfo, message.siteUrl, message.siteName).then(sendResponse);
+      return true;
+
+    case 'SET_AUTH_TOKEN':
+      // 设置认证 token
+      handleSetAuthToken(message.token).then(sendResponse);
+      return true;
+
+    case 'GET_AUTH_TOKEN':
+      // 获取认证 token
+      handleGetAuthToken().then(sendResponse);
+      return true;
+
+    case 'CLEAR_AUTH_TOKEN':
+      // 清除认证 token
+      clearAuthToken().then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'AUTH_TOKEN_UPDATED':
+      // webapp-bridge 通知 token 已更新，无需额外处理
+      sendResponse({ success: true });
+      break;
+
     default:
       console.log('未知消息类型:', message.type);
       sendResponse({ success: false, error: '未知的消息类型' });
@@ -1165,6 +1207,336 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return false;
 });
+
+// ==================== 后端 API 配置 ====================
+
+/** 获取当前环境的 API 基础 URL */
+function getApiBaseUrl() {
+  if (currentEnvironment === 'production') {
+    // 生产环境 - 使用 Railway 部署的后端地址
+    return 'https://candelbot-backend-dev.up.railway.app';
+  }
+  // 开发环境 - 本地后端（也可通过 web app 代理）
+  return 'http://localhost:8001';
+}
+
+// ==================== Auth Token 管理 ====================
+
+/**
+ * 存储认证 token 到 chrome.storage
+ */
+function saveAuthToken(token) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ candlebot_auth_token: token }, () => {
+      console.log('✅ 认证 token 已保存');
+      resolve();
+    });
+  });
+}
+
+/**
+ * 从 chrome.storage 读取认证 token
+ */
+function readAuthToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['candlebot_auth_token'], (result) => {
+      resolve(result.candlebot_auth_token || null);
+    });
+  });
+}
+
+/**
+ * 清除认证 token
+ */
+function clearAuthToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove(['candlebot_auth_token'], () => {
+      console.log('🧹 认证 token 已清除');
+      resolve();
+    });
+  });
+}
+
+// ==================== 浮动组件 Handler ====================
+
+/**
+ * 截图当前可见标签页
+ */
+async function handleBgCaptureScreenshot() {
+  console.log('[BG] 浮动组件请求截图');
+
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 70 }, (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(dataUrl);
+        }
+      });
+    });
+
+    console.log('[BG] 截图成功，数据长度:', dataUrl.length);
+    return { success: true, dataUrl };
+  } catch (error) {
+    console.error('[BG] 截图失败:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 提取当前标签页的图表信息
+ */
+async function handleBgExtractChartInfo() {
+  console.log('[BG] 浮动组件请求提取图表信息');
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      return { success: false, error: '无法获取当前标签页' };
+    }
+
+    // 尝试从内容脚本获取信息
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'EXTRACT_CHART_INFO',
+      site: new URL(tab.url).hostname
+    }).catch(() => null);
+
+    if (response?.success && response.data) {
+      return { success: true, info: response.data };
+    }
+
+    // 本地提取
+    const siteConfig = getSiteConfig(tab.url);
+    const info = {
+      url: tab.url,
+      symbol: null,
+      timeframe: null,
+      exchange: null,
+      site: siteConfig?.name || 'unknown',
+      extracted: false
+    };
+
+    try {
+      const urlObj = new URL(tab.url);
+      const pathParts = urlObj.pathname.split('/').filter(Boolean);
+
+      if (siteConfig?.domain === 'tradingview.com' && pathParts[0] === 'chart' && pathParts.length >= 3) {
+        info.symbol = pathParts[1];
+        info.exchange = pathParts[2];
+        info.extracted = true;
+      } else if (siteConfig?.domain === 'aggr.trade' && pathParts.length >= 2) {
+        info.symbol = pathParts[0];
+        info.exchange = pathParts[1];
+        info.extracted = true;
+      }
+    } catch (_) {}
+
+    return { success: true, info };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 发送图片到后端 API 进行分析
+ */
+async function handleBgAnalyzeImage(imageBase64, platform, lang, chartInfo) {
+  console.log('[BG] 发送图片分析请求，平台:', platform);
+
+  try {
+    // 1. 读取认证 token
+    const token = await readAuthToken();
+    if (!token) {
+      console.warn('[BG] 未设置认证 token');
+      return {
+        success: false,
+        error: 'no_auth',
+        message: '请先在网页版 Candlebot 登录后，在此扩展的设置中填入认证信息'
+      };
+    }
+
+    // 2. 调用后端 API
+    const apiUrl = `${getApiBaseUrl()}/analyze`;
+    console.log('[BG] API URL:', apiUrl);
+    console.log('[BG] 图片长度:', imageBase64.length);
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        platform: platform || 'tradingview',
+        lang: lang || 'zh'
+      })
+    });
+
+    const result = await response.json();
+    console.log('[BG] 分析响应:', result);
+
+    if (!response.ok) {
+      // 处理特定的错误码
+      const detail = result.detail || {};
+      const errorMessage = typeof detail === 'string' ? detail : (detail.message || detail);
+
+      if (response.status === 401) {
+        return {
+          success: false,
+          error: 'auth_failed',
+          message: '认证已过期，请重新登录'
+        };
+      }
+      if (response.status === 429) {
+        return {
+          success: false,
+          error: 'quota_exceeded',
+          message: errorMessage || '今日分析次数已用完'
+        };
+      }
+      if (response.status === 400) {
+        return {
+          success: false,
+          error: 'invalid_image',
+          message: errorMessage || '图片无效，请确保是有效的K线图表截图'
+        };
+      }
+
+      return {
+        success: false,
+        error: 'api_error',
+        message: errorMessage || `服务器错误 (${response.status})`
+      };
+    }
+
+    // 3. 返回分析结果
+    return {
+      success: true,
+      record_id: result.record_id,
+      pair: result.pair,
+      price: result.price,
+      rating: result.rating,
+      rating_score: result.rating_score,
+      timeframe: result.timeframe,
+      summary: result.summary,
+      exchange: result.exchange,
+      analysis: result.analysis || result.report || ''
+    };
+
+  } catch (error) {
+    console.error('[BG] 分析请求失败:', error);
+    return {
+      success: false,
+      error: 'network_error',
+      message: `网络请求失败: ${error.message}`
+    };
+  }
+}
+
+/**
+ * 发送追问
+ */
+async function handleBgAskFollowUp(analysisId, question, chartInfo, siteUrl, siteName) {
+  console.log('[BG] 发送追问，analysisId:', analysisId);
+
+  if (!analysisId) {
+    return {
+      success: false,
+      error: '没有分析记录 ID，请先进行图表分析'
+    };
+  }
+
+  try {
+    const token = await readAuthToken();
+    if (!token) {
+      return {
+        success: false,
+        error: 'no_auth',
+        message: '请先登录'
+      };
+    }
+
+    // 调用 /ask 端点（带 analysis_id）
+    const apiUrl = `${getApiBaseUrl()}/ask`;
+    console.log('[BG] 追问 API URL:', apiUrl);
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        question: question,
+        // 附加上下文信息
+        chart_info: chartInfo || null,
+        site_url: siteUrl || '',
+        site_name: siteName || ''
+      })
+    });
+
+    const result = await response.json();
+    console.log('[BG] 追问响应:', result);
+
+    if (!response.ok) {
+      const detail = result.detail || {};
+      const errorMessage = typeof detail === 'string' ? detail : (detail.message || detail);
+
+      if (response.status === 401) {
+        return { success: false, error: 'auth_failed', message: '认证已过期，请重新登录' };
+      }
+      if (response.status === 429) {
+        return { success: false, error: 'quota_exceeded', message: errorMessage || '追问次数已用完' };
+      }
+
+      return {
+        success: false,
+        error: 'api_error',
+        message: errorMessage || `服务器错误 (${response.status})`
+      };
+    }
+
+    return {
+      success: true,
+      answer: result.answer || result.content || '',
+      conversation_id: result.conversation_id || null
+    };
+
+  } catch (error) {
+    console.error('[BG] 追问请求失败:', error);
+    return {
+      success: false,
+      error: 'network_error',
+      message: `网络请求失败: ${error.message}`
+    };
+  }
+}
+
+/**
+ * 处理设置认证 token
+ */
+async function handleSetAuthToken(token) {
+  if (!token) {
+    return { success: false, error: 'token 不能为空' };
+  }
+  await saveAuthToken(token);
+  return { success: true, message: '认证信息已保存' };
+}
+
+/**
+ * 处理获取认证 token
+ */
+async function handleGetAuthToken() {
+  const token = await readAuthToken();
+  return {
+    success: true,
+    hasToken: !!token,
+    token: token || null
+  };
+}
 
 /**
  * 处理扩展图标点击

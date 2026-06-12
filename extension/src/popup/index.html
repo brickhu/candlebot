@@ -161,12 +161,24 @@
                     </select>
                 </div>
                 <div class="setting-item">
-                    <button class="btn-small" id="testConnectionBtn">
-                        <i class="fas fa-wifi"></i> 测试连接
-                    </button>
-                    <button class="btn-small" id="clearDataBtn">
-                        <i class="fas fa-trash"></i> 清理数据
-                    </button>
+                    <label for="authTokenInput">认证 Token:</label>
+                    <input type="password" id="authTokenInput" class="text-input" placeholder="登录网页版后自动同步">
+                </div>
+                <div class="setting-item">
+                    <div class="setting-actions">
+                        <button class="btn-small" id="saveAuthBtn">
+                            <i class="fas fa-save"></i> 保存
+                        </button>
+                        <button class="btn-small" id="clearAuthBtn">
+                            <i class="fas fa-trash"></i> 清除
+                        </button>
+                        <button class="btn-small" id="testConnectionBtn">
+                            <i class="fas fa-wifi"></i> 测试连接
+                        </button>
+                        <button class="btn-small" id="clearDataBtn">
+                            <i class="fas fa-trash"></i> 清理数据
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
