@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试扩展数据传递</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 20px;
+            background: #0f0f1a;
+            color: #e2e2f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #2a2a3e;
+        }
+        h1 {
+            color: #7c6aff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .card {
+            background: #25253a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 1px solid #2a2a3e;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success { background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; }
+        .error { background: rgba(244, 67, 54, 0.2); color: #f44336; border: 1px solid #f44336; }
+        .info { background: rgba(33, 150, 243, 0.2); color: #2196f3; border: 1px solid #2196f3; }
+        button {
+            background: linear-gradient(135deg, #7c6aff, #4f46e5);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        pre {
+            background: #0f0f1a;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .step-number {
+            width: 24px;
+            height: 24px;
+            background: #7c6aff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .log {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-line {
+            margin: 2px 0;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .log-line.info { color: #2196f3; }
+        .log-line.success { color: #4caf50; }
+        .log-line.error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 扩展数据传递测试</h1>
+
+        <div class="card">
+            <h3>📋 当前状态</h3>
+            <div id="currentStatus" class="status info">正在检查...</div>
+            <button onclick="refreshStatus()">🔄 刷新状态</button>
+        </div>
+
+        <div class="card">
+            <h3>🧪 测试步骤</h3>
+
+            <div class="step">
+                <div class="step-number">1</div>
+                <div>检查扩展内容脚本是否加载</div>
+            </div>
+            <button onclick="checkContentScript()">检查内容脚本</button>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <div>模拟扩展数据注入</div>
+            </div>
+            <button onclick="simulateExtension()">模拟扩展数据</button>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <div>测试跳转到 /new 页面</div>
+            </div>
+            <button onclick="goToNewPage()">前往 /new 页面</button>
+        </div>
+
+        <div class="card">
+            <h3>📊 数据详情</h3>
+            <button onclick="showDataDetails()">显示数据详情</button>
+            <pre id="dataDetails"></pre>
+        </div>
+
+        <div class="card">
+            <h3>📝 日志</h3>
+            <div class="log" id="logOutput">
+                <div class="log-line info">页面加载完成</div>
+            </div>
+            <button onclick="clearLog()">清空日志</button>
+        </div>
+    </div>
+
+    <script>
+        // 日志系统
+        const logOutput = document.getElementById('logOutput')
+        function addLog(message, type = 'info') {
+            const line = document.createElement('div')
+            line.className = `log-line ${type}`
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            logOutput.appendChild(line)
+            logOutput.scrollTop = logOutput.scrollHeight
+            console.log(`[${type}]`, message)
+        }
+
+        // 刷新状态
+        function refreshStatus() {
+            const statusEl = document.getElementById('currentStatus')
+            const url = new URL(window.location)
+
+            const checks = [
+                { name: '当前URL', value: window.location.href },
+                { name: 'from_extension参数', value: url.searchParams.get('from_extension') || '未设置' },
+                { name: 'sessionStorage数据', value: sessionStorage.getItem('candlebot_extension_image') ? `存在 (${sessionStorage.getItem('candlebot_extension_image').length} 字符)` : '不存在' },
+                { name: 'localStorage数据', value: localStorage.getItem('candlebot_extension_image') ? '存在' : '不存在' },
+                { name: '认证token', value: localStorage.getItem('auth_token') ? '存在' : '不存在' }
+            ]
+
+            let html = ''
+            checks.forEach(check => {
+                html += `<div>${check.name}: <strong>${check.value}</strong></div>`
+            })
+
+            statusEl.innerHTML = html
+            addLog('状态已刷新', 'info')
+        }
+
+        // 检查内容脚本
+        function checkContentScript() {
+            addLog('检查内容脚本...', 'info')
+
+            // 检查是否在扩展上下文中
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                addLog('✅ 检测到扩展API', 'success')
+
+                // 尝试发送测试消息
+                chrome.runtime.sendMessage({ type: 'TEST' }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        addLog(`❌ 扩展通信失败: ${chrome.runtime.lastError.message}`, 'error')
+                    } else {
+                        addLog('✅ 扩展通信正常', 'success')
+                    }
+                })
+            } else {
+                addLog('❌ 未检测到扩展API（可能不在扩展上下文中）', 'error')
+            }
+        }
+
+        // 模拟扩展数据
+        function simulateExtension() {
+            addLog('开始模拟扩展数据注入...', 'info')
+
+            try {
+                // 创建模拟的base64图片数据
+                const mockImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+                const base64Only = mockImageData.replace(/^data:image\/png;base64,/, '')
+
+                // 存储到sessionStorage
+                sessionStorage.setItem('candlebot_extension_image', base64Only)
+                addLog(`✅ 数据已存储到sessionStorage，长度: ${base64Only.length} 字符`, 'success')
+
+                // 设置URL参数
+                const url = new URL(window.location)
+                url.searchParams.set('from_extension', 'true')
+                window.history.replaceState({}, '', url.toString())
+                addLog(`✅ URL已更新: ${window.location.href}`, 'success')
+
+                // 触发事件
+                window.dispatchEvent(new CustomEvent('candlebot_extension_data_ready', {
+                    detail: {
+                        dataLength: base64Only.length,
+                        simulated: true,
+                        timestamp: Date.now()
+                    }
+                }))
+                addLog('✅ 已触发数据就绪事件', 'success')
+
+                refreshStatus()
+
+            } catch (error) {
+                addLog(`❌ 模拟失败: ${error.message}`, 'error')
+            }
+        }
+
+        // 前往 /new 页面
+        function goToNewPage() {
+            addLog('跳转到 /new 页面...', 'info')
+
+            // 检查是否有数据
+            const imageData = sessionStorage.getItem('candlebot_extension_image')
+            if (!imageData) {
+                addLog('❌ 没有找到截图数据，请先模拟扩展数据', 'error')
+                return
+            }
+
+            // 构建URL
+            const url = new URL('/new', window.location.origin)
+            url.searchParams.set('from_extension', 'true')
+
+            addLog(`正在跳转到: ${url.toString()}`, 'info')
+
+            // 跳转
+            setTimeout(() => {
+                window.location.href = url.toString()
+            }, 1000)
+        }
+
+        // 显示数据详情
+        function showDataDetails() {
+            const detailsEl = document.getElementById('dataDetails')
+            const imageData = sessionStorage.getItem('candlebot_extension_image')
+
+            if (imageData) {
+                const data = {
+                    fromExtension: new URL(window.location).searchParams.get('from_extension'),
+                    hasImageData: true,
+                    dataLength: imageData.length,
+                    dataType: 'base64',
+                    preview: imageData.substring(0, 100) + '...',
+                    fullDataAvailable: imageData.length < 1000
+                }
+
+                detailsEl.textContent = JSON.stringify(data, null, 2)
+                addLog('已显示数据详情', 'info')
+            } else {
+                detailsEl.textContent = '没有找到扩展数据'
+                addLog('没有找到扩展数据', 'error')
+            }
+        }
+
+        // 清空日志
+        function clearLog() {
+            logOutput.innerHTML = '<div class="log-line info">日志已清空</div>'
+            addLog('日志已清空', 'info')
+        }
+
+        // 监听扩展数据就绪事件
+        window.addEventListener('candlebot_extension_data_ready', (event) => {
+            addLog(`📢 收到扩展数据就绪事件！数据长度: ${event.detail.dataLength}`, 'success')
+            if (event.detail.simulated) {
+                addLog('⚠️ 这是模拟数据', 'info')
+            }
+        })
+
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('页面加载完成', 'info')
+            refreshStatus()
+
+            // 检查是否已有扩展数据
+            const hasData = sessionStorage.getItem('candlebot_extension_image')
+            if (hasData) {
+                addLog(`发现已存在的扩展数据，长度: ${hasData.length}`, 'success')
+            }
+        })
+
+        // 添加键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault()
+                refreshStatus()
+            }
+        })
+    </script>
+</body>
+</html>

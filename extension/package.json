@@ -1,23 +1,23 @@
 {
   "name": "candlebot-extension",
   "version": "1.0.0",
-  "private": true,
-  "type": "module",
+  "description": "Candlebot K线分析助手浏览器扩展",
+  "main": "src/background/index.js",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test:oauth": "echo '打开 test-oauth.html 文件测试OAuth配置'"
+    "generate-icons": "node generate-icons.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "solid-js": "^1.8.17",
-    "@solidjs/router": "^0.13.6"
-  },
+  "keywords": [
+    "candlebot",
+    "extension",
+    "chrome-extension",
+    "trading",
+    "chart",
+    "screenshot"
+  ],
+  "author": "Candlebot Team",
+  "license": "MIT",
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.23",
-    "@tailwindcss/vite": "^4.2.1",
-    "tailwindcss": "^4.0.0",
-    "vite": "^5.2.0",
-    "vite-plugin-solid": "^2.10.2"
+    "canvas": "^2.11.2"
   }
 }

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>认证修复测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 { color: #333; }
+    .test-case {
+      background: #f5f5f5;
+      border-left: 4px solid #7c6aff;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .success { color: #00e87a; }
+    .error { color: #ff3b5c; }
+    .warning { color: #ffaa00; }
+    button {
+      background: #7c6aff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #6d5cf5;
+    }
+    .code {
+      background: #1e1e30;
+      color: #e2e2f0;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      overflow-x: auto;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>认证系统修复测试</h1>
+
+  <div class="test-case">
+    <h2>测试 1: 检查当前认证状态</h2>
+    <button onclick="checkAuthStatus()">检查认证状态</button>
+    <div id="authStatusResult" class="result"></div>
+  </div>
+
+  <div class="test-case">
+    <h2>测试 2: 模拟访问 /new 页面</h2>
+    <p>模拟未登录用户访问受保护页面：</p>
+    <button onclick="simulateNewPageAccess()">模拟访问 /new</button>
+    <div id="newPageResult" class="result"></div>
+  </div>
+
+  <div class="test-case">
+    <h2>测试 3: 检查AuthProvider配置</h2>
+    <p>受保护路径配置：</p>
+    <div class="code">const protectedPaths = ['/new', '/dashboard', '/analysis']</div>
+    <button onclick="checkProtectedPaths()">检查当前路径</button>
+    <div id="pathsResult" class="result"></div>
+  </div>
+
+  <div class="test-case">
+    <h2>测试 4: 验证重定向逻辑</h2>
+    <p>测试从 /new 重定向到 /login 的URL参数：</p>
+    <button onclick="testRedirectParams()">测试重定向参数</button>
+    <div id="redirectResult" class="result"></div>
+  </div>
+
+  <div class="test-case">
+    <h2>测试 5: 实际页面访问</h2>
+    <p>实际访问页面测试：</p>
+    <button onclick="window.open('http://localhost:5173/new', '_blank')">访问 /new</button>
+    <button onclick="window.open('http://localhost:5173/dashboard', '_blank')">访问 /dashboard</button>
+    <button onclick="window.open('http://localhost:5173/test-upload', '_blank')">访问 /test-upload</button>
+  </div>
+
+  <script>
+    function checkAuthStatus() {
+      const token = localStorage.getItem('auth_token')
+      const result = document.getElementById('authStatusResult')
+
+      if (token) {
+        result.innerHTML = `<div class="success">✅ 有认证Token: ${token.substring(0, 20)}...</div>`
+      } else {
+        result.innerHTML = `<div class="warning">⚠️ 没有认证Token</div>`
+      }
+    }
+
+    function simulateNewPageAccess() {
+      const result = document.getElementById('newPageResult')
+      const currentPath = '/new'
+      const token = localStorage.getItem('auth_token')
+
+      result.innerHTML = `
+        <div>模拟访问: ${currentPath}</div>
+        <div>Token状态: ${token ? '有' : '无'}</div>
+        <div>预期行为: ${token ? '正常访问' : '重定向到 /login?from=/new'}</div>
+      `
+    }
+
+    function checkProtectedPaths() {
+      const protectedPaths = ['/new', '/dashboard', '/analysis']
+      const currentPath = window.location.pathname
+      const result = document.getElementById('pathsResult')
+
+      const isProtected = protectedPaths.some(path => currentPath.startsWith(path))
+
+      result.innerHTML = `
+        <div>当前路径: ${currentPath}</div>
+        <div>是否受保护: ${isProtected ? '是' : '否'}</div>
+        <div>受保护路径: ${protectedPaths.join(', ')}</div>
+      `
+    }
+
+    function testRedirectParams() {
+      const fromPath = '/new'
+      const redirectUrl = `/login?from=${encodeURIComponent(fromPath)}`
+      const result = document.getElementById('redirectResult')
+
+      result.innerHTML = `
+        <div>来源路径: ${fromPath}</div>
+        <div>重定向URL: ${redirectUrl}</div>
+        <div>解码测试: ${new URLSearchParams(redirectUrl.split('?')[1]).get('from')}</div>
+      `
+    }
+
+    // 初始检查
+    checkAuthStatus()
+    checkProtectedPaths()
+  </script>
+</body>
+</html>

@@ -9,3 +9,4 @@ __pycache__/
 Thumbs.db
 *.egg-info/
 test/
+testfastapi/

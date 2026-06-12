@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot快速测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        button.secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        button.secondary:hover {
+            background: #cbd5e0;
+        }
+        .log {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Candlebot扩展快速测试</h1>
+
+    <div class="test-section">
+        <h3>测试1: 生成测试URL</h3>
+        <p>创建一个包含测试图片数据的URL，模拟扩展跳转。</p>
+
+        <button onclick="generateTestUrl()">生成测试URL</button>
+        <button onclick="openTestUrl()" class="secondary">打开测试页面</button>
+
+        <div id="url-output" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试2: 检查当前页面</h3>
+        <p>检查当前页面是否从扩展跳转，并显示图片数据。</p>
+
+        <button onclick="checkCurrentPage()">检查当前页面</button>
+        <button onclick="clearStorage()" class="secondary">清理存储</button>
+
+        <div id="page-check" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试3: 模拟扩展流程</h3>
+        <p>模拟完整的扩展截图和跳转流程。</p>
+
+        <button onclick="simulateExtensionFlow()">模拟扩展流程</button>
+
+        <div id="simulation-log" class="log"></div>
+    </div>
+
+    <script>
+        function logTo(elementId, message, className = '') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span class="${className}">[${timestamp}] ${message}</span>`;
+            element.appendChild(logEntry);
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        // 创建一个小的测试图片（1x1像素）
+        function createSmallTestImage() {
+            // 1x1像素红色JPEG的base64编码（非常小）
+            return '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
+        }
+
+        function generateTestUrl() {
+            clearLog('url-output');
+
+            const testData = createSmallTestImage();
+            const baseUrl = 'http://localhost:5173/new';
+            const url = new URL(baseUrl);
+
+            url.searchParams.set('from_extension', 'true');
+            url.searchParams.set('image_data', testData);
+            url.searchParams.set('image_format', 'jpeg');
+            url.searchParams.set('site', 'test_site');
+            url.searchParams.set('symbol', 'TEST/USDT');
+            url.searchParams.set('data_source', 'url_params');
+
+            const urlString = url.toString();
+
+            logTo('url-output', `生成的URL长度: ${urlString.length}`, 'success');
+            logTo('url-output', `URL: ${urlString.substring(0, 100)}...`);
+            logTo('url-output', `image_data长度: ${testData.length}`);
+
+            // 保存URL供后续使用
+            window.lastTestUrl = urlString;
+
+            return urlString;
+        }
+
+        function openTestUrl() {
+            if (!window.lastTestUrl) {
+                alert('请先生成测试URL');
+                return;
+            }
+
+            window.open(window.lastTestUrl, '_blank');
+            logTo('url-output', '已在新标签页打开测试URL', 'success');
+        }
+
+        function checkCurrentPage() {
+            clearLog('page-check');
+
+            // 检查URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromExtension = urlParams.get('from_extension');
+            const imageData = urlParams.get('image_data');
+
+            logTo('page-check', `当前页面URL: ${window.location.href.substring(0, 100)}...`);
+            logTo('page-check', `from_extension: ${fromExtension || '无'}`);
+            logTo('page-check', `image_data: ${imageData ? `有 (${imageData.length} 字符)` : '无'}`);
+
+            if (imageData) {
+                logTo('page-check', `image_data前50字符: ${imageData.substring(0, 50)}...`, 'success');
+
+                // 尝试解码base64
+                try {
+                    atob(imageData);
+                    logTo('page-check', 'base64数据有效，可以解码', 'success');
+                } catch (e) {
+                    logTo('page-check', `base64解码失败: ${e.message}`, 'error');
+                }
+            }
+
+            // 检查storage
+            const sessionData = sessionStorage.getItem('candlebot_extension_image');
+            const localData = localStorage.getItem('candlebot_extension_image');
+
+            logTo('page-check', `sessionStorage数据: ${sessionData ? `有 (${sessionData.length} 字符)` : '无'}`);
+            logTo('page-check', `localStorage数据: ${localData ? `有 (${localData.length} 字符)` : '无'}`);
+        }
+
+        function clearStorage() {
+            sessionStorage.removeItem('candlebot_extension_image');
+            localStorage.removeItem('candlebot_extension_image');
+
+            // 清理URL参数
+            const url = new URL(window.location);
+            url.searchParams.delete('from_extension');
+            url.searchParams.delete('image_data');
+            window.history.replaceState({}, '', url.toString());
+
+            logTo('page-check', '已清理所有扩展数据', 'success');
+        }
+
+        function simulateExtensionFlow() {
+            clearLog('simulation-log');
+
+            logTo('simulation-log', '1. 模拟扩展截图...', 'warning');
+
+            // 创建一个模拟的截图数据（小JPEG图片）
+            const testImage = createSmallTestImage();
+            const dataUrl = `data:image/jpeg;base64,${testImage}`;
+
+            logTo('simulation-log', `模拟截图数据大小: ${dataUrl.length} 字符`, 'success');
+            logTo('simulation-log', `纯base64大小: ${testImage.length} 字符`, 'success');
+
+            // 检查是否适合URL传递
+            if (testImage.length <= 5000) {
+                logTo('simulation-log', `数据大小 ${testImage.length} <= 5000，适合URL传递`, 'success');
+
+                // 生成URL
+                const url = generateTestUrl();
+                logTo('simulation-log', `2. 生成跳转URL: ${url.substring(0, 80)}...`, 'success');
+
+                // 模拟跳转
+                logTo('simulation-log', '3. 模拟用户点击"立即分析"...', 'warning');
+                setTimeout(() => {
+                    window.open(url, '_blank');
+                    logTo('simulation-log', '4. 已在新标签页打开分析页面', 'success');
+                    logTo('simulation-log', '5. 在新页面中运行 checkCurrentPage() 检查数据', 'warning');
+                }, 1000);
+
+            } else {
+                logTo('simulation-log', `数据太大 (${testImage.length} > 5000)，不适合URL传递`, 'error');
+                logTo('simulation-log', '需要尝试其他数据传递方法', 'warning');
+            }
+        }
+
+        // 页面加载时显示基本信息
+        window.addEventListener('load', () => {
+            const urlCheck = document.getElementById('page-check');
+            if (window.location.href.includes('localhost:5173')) {
+                logTo('page-check', '检测到web app页面，可以运行测试', 'success');
+            } else if (window.location.href.includes('file://')) {
+                logTo('page-check', '本地测试页面，可以生成测试URL', 'warning');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 """
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON, DECIMAL
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, deferred
 from database import Base
 import datetime
 
@@ -27,9 +27,9 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     # OAuth相关字段
-    provider = Column(String(50), nullable=True)  # google, github等
-    provider_id = Column(String(255), nullable=True, index=True)  # 第三方平台用户ID
-    oauth_metadata = Column(JSON, nullable=True)  # 原始OAuth数据
+    provider = Column(String(50), nullable=True, default=None)  # google, github等
+    provider_id = Column(String(255), nullable=True, default=None, index=True)  # 第三方平台用户ID
+    oauth_metadata = Column(JSON, nullable=True, default=None)  # 原始OAuth数据
 
     # 关系
     analyses = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")
@@ -44,9 +44,10 @@ class AnalysisRecord(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     platform = Column(String(50), nullable=False)  # aggr/tradingview
     image_hash = Column(String(64))  # 图片哈希（去重）
-    image_data = Column(Text)        # base64编码的图片（可选存储）
+    image_data = Column(Text)        # 图片数据：base64编码或对象存储URL
     report_data = Column(JSON, nullable=False)  # 完整的报告数据
     analysis_metadata = Column(JSON, nullable=False)     # 元数据：rating, pair, price等
+    visibility = deferred(Column(String(20), default="private", nullable=True))   # 可见性：private/public
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
@@ -86,6 +87,19 @@ class PaymentRecord(Base):
 
     # 关系
     user = relationship("User", back_populates="payments")
+
+
+class VerificationCode(Base):
+    __tablename__ = "verification_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    code = Column(String(6), nullable=False)  # 6位数字验证码
+    code_type = Column(String(50), nullable=False, default="register")  # register, reset_password, change_email
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    attempts = Column(Integer, default=0)  # 验证尝试次数
 
 
 class APILog(Base):

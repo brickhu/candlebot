@@ -1,0 +1,11 @@
+{
+  "name": "TradingView",
+  "description": "TradingView交易图表平台",
+  "supported_languages": ["zh", "en"],
+  "features": ["技术指标", "绘图工具", "多时间周期"],
+  "validation_requirements": {
+    "min_width": 600,
+    "aspect_ratio": [1.5, 2.5],
+    "required_elements": ["K线图", "技术指标", "价格轴"]
+  }
+}

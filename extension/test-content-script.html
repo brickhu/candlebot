@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candlebot扩展内容脚本测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow: auto;
+            font-size: 12px;
+        }
+        .log {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Candlebot扩展内容脚本测试</h1>
+    <p>此页面用于测试Candlebot扩展的内容脚本加载和通信功能。</p>
+
+    <div class="test-section">
+        <h2>1. 基础检查</h2>
+        <div id="basicChecks">
+            <p>检查中...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 扩展环境检查</h2>
+        <button onclick="checkExtensionEnvironment()">检查扩展环境</button>
+        <div id="extensionEnv" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 内容脚本通信测试</h2>
+        <button onclick="testContentScriptCommunication()">测试通信</button>
+        <div id="communicationTest" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 模拟截图数据传输</h2>
+        <button onclick="testScreenshotTransfer()">测试数据传输</button>
+        <div id="dataTransferTest" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 支持的网站测试</h2>
+        <div id="supportedSites">
+            <p>测试URL匹配...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>6. 诊断日志</h2>
+        <button onclick="clearLogs()">清空日志</button>
+        <div id="diagnosticLogs" class="log"></div>
+    </div>
+
+    <script>
+        const logs = [];
+        const logElement = document.getElementById('diagnosticLogs');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logs.push({ message: logEntry, type });
+
+            if (logElement) {
+                const div = document.createElement('div');
+                div.textContent = logEntry;
+                div.className = type;
+                logElement.appendChild(div);
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLogs() {
+            logs.length = 0;
+            if (logElement) {
+                logElement.innerHTML = '';
+            }
+        }
+
+        // 1. 基础检查
+        function performBasicChecks() {
+            const basicChecks = document.getElementById('basicChecks');
+            let html = '';
+
+            // 检查chrome API
+            if (typeof chrome !== 'undefined') {
+                html += '<p class="success">✅ chrome API可用</p>';
+
+                if (chrome.runtime) {
+                    html += '<p class="success">✅ chrome.runtime可用</p>';
+
+                    // 获取扩展ID
+                    if (chrome.runtime.id) {
+                        html += `<p class="success">✅ 扩展ID: ${chrome.runtime.id}</p>`;
+                    } else {
+                        html += '<p class="warning">⚠️ 扩展ID未找到（可能不在扩展上下文中）</p>';
+                    }
+                } else {
+                    html += '<p class="error">❌ chrome.runtime不可用</p>';
+                }
+            } else {
+                html += '<p class="error">❌ chrome API不可用（不在扩展上下文中）</p>';
+            }
+
+            // 检查内容脚本
+            if (typeof window.candlebotExtension !== 'undefined') {
+                html += '<p class="success">✅ Candlebot内容脚本已加载</p>';
+                try {
+                    const state = window.candlebotExtension.getState();
+                    html += `<p>内容脚本状态: ${JSON.stringify(state, null, 2)}</p>`;
+                } catch (e) {
+                    html += `<p class="warning">⚠️ 无法获取内容脚本状态: ${e.message}</p>`;
+                }
+            } else {
+                html += '<p class="warning">⚠️ Candlebot内容脚本未加载</p>';
+                html += '<p>可能原因:</p>';
+                html += '<ul>';
+                html += '<li>当前页面不在支持的网站列表中</li>';
+                html += '<li>内容脚本加载失败</li>';
+                html += '<li>页面未完全加载</li>';
+                html += '</ul>';
+            }
+
+            basicChecks.innerHTML = html;
+        }
+
+        // 2. 扩展环境检查
+        function checkExtensionEnvironment() {
+            const envElement = document.getElementById('extensionEnv');
+            envElement.innerHTML = '检查中...';
+
+            setTimeout(() => {
+                let html = '';
+
+                // 检查权限
+                if (chrome && chrome.permissions) {
+                    chrome.permissions.getAll(permissions => {
+                        html += `<p>权限: ${JSON.stringify(permissions)}</p>`;
+                        envElement.innerHTML = html;
+                    });
+                } else {
+                    html += '<p class="warning">⚠️ 无法检查权限</p>';
+                    envElement.innerHTML = html;
+                }
+
+                // 检查manifest
+                if (chrome && chrome.runtime && chrome.runtime.getManifest) {
+                    const manifest = chrome.runtime.getManifest();
+                    html += `<p>扩展名称: ${manifest.name}</p>`;
+                    html += `<p>版本: ${manifest.version}</p>`;
+
+                    if (manifest.content_scripts) {
+                        html += '<p>内容脚本配置:</p>';
+                        manifest.content_scripts.forEach((cs, i) => {
+                            html += `<p>脚本 ${i + 1}: 匹配 ${cs.matches.length} 个模式</p>`;
+                        });
+                    }
+                }
+
+                envElement.innerHTML = html;
+            }, 100);
+        }
+
+        // 3. 内容脚本通信测试
+        function testContentScriptCommunication() {
+            const commElement = document.getElementById('communicationTest');
+            commElement.innerHTML = '测试中...';
+
+            if (!chrome.runtime) {
+                commElement.innerHTML = '<p class="error">❌ chrome.runtime不可用</p>';
+                return;
+            }
+
+            // 测试PING消息
+            chrome.runtime.sendMessage({ type: 'PING' }, response => {
+                if (chrome.runtime.lastError) {
+                    commElement.innerHTML = `<p class="error">❌ 通信失败: ${chrome.runtime.lastError.message}</p>`;
+                    log(`通信失败: ${chrome.runtime.lastError.message}`, 'error');
+                } else if (response && response.pong) {
+                    commElement.innerHTML = `<p class="success">✅ 通信成功！响应: ${JSON.stringify(response)}</p>`;
+                    log(`通信成功: ${JSON.stringify(response)}`, 'success');
+                } else {
+                    commElement.innerHTML = '<p class="warning">⚠️ 收到未知响应</p>';
+                    log(`未知响应: ${JSON.stringify(response)}`, 'warning');
+                }
+            });
+        }
+
+        // 4. 模拟截图数据传输
+        function testScreenshotTransfer() {
+            const transferElement = document.getElementById('dataTransferTest');
+            transferElement.innerHTML = '模拟数据传输中...';
+
+            // 创建测试图片数据
+            const testImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+            if (!chrome.runtime) {
+                transferElement.innerHTML = '<p class="error">❌ chrome.runtime不可用</p>';
+                return;
+            }
+
+            // 发送测试数据
+            chrome.runtime.sendMessage({
+                type: 'SET_SCREENSHOT_DATA',
+                data: testImageData,
+                metadata: {
+                    test: true,
+                    timestamp: new Date().toISOString()
+                }
+            }, response => {
+                if (chrome.runtime.lastError) {
+                    transferElement.innerHTML = `<p class="error">❌ 数据传输失败: ${chrome.runtime.lastError.message}</p>`;
+                    log(`数据传输失败: ${chrome.runtime.lastError.message}`, 'error');
+                } else if (response && response.success) {
+                    transferElement.innerHTML = `<p class="success">✅ 数据传输成功！响应: ${JSON.stringify(response)}</p>`;
+                    log(`数据传输成功: ${JSON.stringify(response)}`, 'success');
+
+                    // 检查数据是否存储
+                    setTimeout(() => {
+                        const stored = sessionStorage.getItem('candlebot_extension_image');
+                        if (stored) {
+                            log(`数据已存储到sessionStorage，长度: ${stored.length}`, 'success');
+                        } else {
+                            log('数据未存储到sessionStorage', 'warning');
+                        }
+                    }, 100);
+                } else {
+                    transferElement.innerHTML = `<p class="warning">⚠️ 数据传输响应: ${JSON.stringify(response)}</p>`;
+                    log(`数据传输响应: ${JSON.stringify(response)}`, 'warning');
+                }
+            });
+        }
+
+        // 5. 支持的网站测试
+        function testSupportedSites() {
+            const sitesElement = document.getElementById('supportedSites');
+            let html = '<p>测试URL匹配模式:</p>';
+
+            const testPatterns = [
+                '*://*.tradingview.com/*',
+                '*://*.aggr.trade/*',
+                '*://*.dextools.io/*',
+                '*://*.dexscreener.com/*',
+                '*://*.birdeye.so/*',
+                '*://*.geckoterminal.com/*'
+            ];
+
+            const testUrls = [
+                'https://www.tradingview.com/chart/BTCUSDT/BINANCE',
+                'https://aggr.trade/BTC/USDT',
+                'https://www.dextools.io/app/ether/pair-explorer/0x123',
+                'https://dexscreener.com/ethereum/0x123',
+                'https://birdeye.so/token/0x123',
+                'https://geckoterminal.com/eth/pools/0x123',
+                'https://example.com/not-supported'
+            ];
+
+            html += '<table border="1" cellpadding="5" cellspacing="0">';
+            html += '<tr><th>测试URL</th><th>匹配结果</th></tr>';
+
+            testUrls.forEach(url => {
+                let matched = false;
+                let matchedPattern = '';
+
+                testPatterns.forEach(pattern => {
+                    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\//g, '\\/') + '$');
+                    if (regex.test(url)) {
+                        matched = true;
+                        matchedPattern = pattern;
+                    }
+                });
+
+                html += `<tr>
+                    <td>${url}</td>
+                    <td class="${matched ? 'success' : 'error'}">
+                        ${matched ? `✅ 匹配 ${matchedPattern}` : '❌ 不匹配'}
+                    </td>
+                </tr>`;
+            });
+
+            html += '</table>';
+            sitesElement.innerHTML = html;
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            performBasicChecks();
+            testSupportedSites();
+            log('测试页面已加载', 'info');
+
+            // 如果内容脚本已加载，显示更多选项
+            if (window.candlebotExtension) {
+                log('Candlebot内容脚本已检测到', 'success');
+            }
+        });
+
+        // 添加全局诊断函数
+        window.diagnoseCandlebot = function() {
+            log('运行完整诊断...', 'info');
+            performBasicChecks();
+            checkExtensionEnvironment();
+            testContentScriptCommunication();
+            testScreenshotTransfer();
+            testSupportedSites();
+        };
+    </script>
+</body>
+</html>

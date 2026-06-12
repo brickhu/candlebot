@@ -13,6 +13,22 @@ from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 import httpx
+
+
+class InvalidImageError(HTTPException):
+    """自定义异常：无效图片错误"""
+    def __init__(self, reason: str, reason_en: str = None):
+        if reason_en is None:
+            reason_en = reason  # 暂时使用相同文本
+
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "invalid_image",
+                "message": f"图片不符合要求: {reason}",
+                "message_en": f"Invalid image: {reason_en}"
+            }
+        )
 from sqlalchemy.orm import Session
 
 # 导入自定义模块
@@ -21,6 +37,16 @@ import models
 import schemas
 import auth
 from routers import auth as auth_router, analysis as analysis_router, conversation as conversation_router, oauth as oauth_router
+
+# 导入新的AI配置系统
+from ai.config.manager import ConfigManager
+from ai.validation.validator import ImageValidator
+
+# 导入简化的提示词管理器
+from ai.prompt_manager import get_prompt_manager
+
+# 导入对象存储模块
+from storage import storage_service, storage_config
 
 # 创建数据库表
 models.Base.metadata.create_all(bind=engine)
@@ -31,8 +57,68 @@ app = FastAPI(
     description="AI驱动的K线图表分析API，支持用户系统和历史记录",
     version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    openapi_tags=[
+        {
+            "name": "authentication",
+            "description": "用户认证相关操作"
+        },
+        {
+            "name": "analysis",
+            "description": "K线图表分析"
+        },
+        {
+            "name": "conversation",
+            "description": "对话管理"
+        }
+    ]
 )
+
+# 配置OpenAPI安全方案
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # 添加安全方案
+    openapi_schema["components"] = {
+        "securitySchemes": {
+            "OAuth2PasswordBearer": {
+                "type": "oauth2",
+                "flows": {
+                    "password": {
+                        "tokenUrl": "auth/login",
+                        "scopes": {}
+                    }
+                }
+            }
+        }
+    }
+
+    # 为需要认证的端点添加安全要求
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        # 排除不需要认证的路径
+        if path in ["/", "/health", "/debug/db-test", "/debug/test-register",
+                   "/auth/register", "/auth/login", "/auth/login-json"]:
+            continue
+
+        for method in path_item.keys():
+            if method in ["get", "post", "put", "delete", "patch"]:
+                # 添加安全要求
+                path_item[method]["security"] = [{"OAuth2PasswordBearer": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # CORS中间件
 app.add_middleware(
@@ -43,11 +129,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 启动事件：初始化提示词管理器
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化提示词管理器"""
+    try:
+        prompt_manager = get_prompt_manager()
+        platforms = prompt_manager.list_platforms()
+        print(f"✅ 提示词管理器初始化完成，支持 {len(platforms)} 个平台: {platforms}")
+    except Exception as e:
+        print(f"❌ 提示词管理器初始化异常: {e}")
+
+# 导入管理路由
+from routers import admin as admin_router
+
 # 包含路由
 app.include_router(auth_router.router)
 app.include_router(analysis_router.router)
 app.include_router(conversation_router.router)
 app.include_router(oauth_router.router)
+app.include_router(admin_router.router)
 
 # 环境变量配置
 def load_env_from_file():
@@ -71,20 +172,722 @@ env_from_file = load_env_from_file()
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", env_from_file.get("MODEL_PROVIDER", "deepseek"))
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", env_from_file.get("DEEPSEEK_API_KEY", ""))
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", env_from_file.get("MINIMAX_API_KEY", ""))
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", env_from_file.get("QWEN_API_KEY", ""))
 
 print(f"MODEL_PROVIDER: {MODEL_PROVIDER}")
 print(f"MINIMAX_API_KEY长度: {len(MINIMAX_API_KEY) if MINIMAX_API_KEY else 0}")
 print(f"DEEPSEEK_API_KEY长度: {len(DEEPSEEK_API_KEY) if DEEPSEEK_API_KEY else 0}")
+print(f"QWEN_API_KEY长度: {len(QWEN_API_KEY) if QWEN_API_KEY else 0}")
 
 # API 端点配置
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
 MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
 MINIMAX_MODEL = "MiniMax-Text-01"
+QWEN_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+QWEN_MODEL = "qwen-plus"
 
-# 提示词配置（保持不变）
-PROMPT_AGGR = """
-你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
+# 初始化配置管理器
+try:
+    config_manager = ConfigManager()
+    image_validator = ImageValidator(config_manager)
+    print("✅ AI配置系统初始化完成")
+except Exception as e:
+    print(f"❌ AI配置系统初始化失败: {e}")
+    # 使用默认配置继续运行
+    config_manager = None
+    image_validator = None
+
+# 初始化提示词管理器
+prompt_manager = get_prompt_manager()
+
+# 提示词配置已迁移到外部文件
+# 使用 config_manager 加载提示词
+
+
+@app.get("/")
+async def root():
+    """API根端点"""
+    return {
+        "name": "Candlebot API",
+        "version": "2.0.0",
+        "description": "AI驱动的K线图表分析API",
+        "docs": "/docs",
+        "endpoints": {
+            "auth": "/auth",
+            "analysis": "/analysis",
+            "conversation": "/conversation"
+        }
+    }
+
+
+@app.get("/health")
+async def health():
+    """健康检查端点"""
+    model_map = {
+        "minimax": MINIMAX_MODEL,
+        "deepseek": DEEPSEEK_MODEL,
+        "qwen": QWEN_MODEL
+    }
+    model = model_map.get(MODEL_PROVIDER, DEEPSEEK_MODEL)
+
+    return {
+        "status": "ok",
+        "provider": MODEL_PROVIDER,
+        "model": model,
+        "database": "connected",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.get("/debug/db-test")
+async def debug_db_test(db: Session = Depends(get_db)):
+    """调试端点：测试数据库连接和表结构"""
+    try:
+        # 测试查询
+        user_count = db.query(models.User).count()
+
+        # 测试表结构
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        tables = inspector.get_table_names()
+
+        # 检查users表结构
+        users_columns = []
+        if 'users' in tables:
+            users_columns = inspector.get_columns('users')
+
+        return {
+            "status": "ok",
+            "user_count": user_count,
+            "tables": tables,
+            "users_columns": [
+                {
+                    "name": col['name'],
+                    "type": str(col['type']),
+                    "nullable": col.get('nullable', True),
+                    "default": col.get('default')
+                }
+                for col in users_columns
+            ]
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"数据库调试错误:\n{error_details}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
+
+@app.post("/debug/test-register")
+async def debug_test_register(
+    email: str = "debug@example.com",
+    password: str = "debug123",
+    db: Session = Depends(get_db)
+):
+    """调试端点：简单测试用户注册"""
+    try:
+        print(f"调试注册: email={email}")
+
+        # 检查邮箱是否已存在
+        existing_user = db.query(models.User).filter(
+            models.User.email == email
+        ).first()
+        if existing_user:
+            return {"status": "error", "message": "邮箱已存在"}
+
+        # 简单创建用户，不使用auth模块
+        from datetime import datetime, timedelta
+        db_user = models.User(
+            email=email,
+            password_hash="debug_hash",  # 简单哈希
+            username=email.split("@")[0],
+            plan_type="free",
+            quota_total=5,
+            quota_used=0,
+            quota_reset_date=datetime.utcnow() + timedelta(days=1),
+            settings={},
+            provider=None,
+            provider_id=None,
+            oauth_metadata=None
+        )
+
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+        return {
+            "status": "success",
+            "message": "用户创建成功",
+            "user_id": db_user.id
+        }
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"调试注册错误:\n{error_details}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": error_details
+        }
+
+
+@app.post("/analyze", response_model=schemas.AnalyzeResponse)
+async def analyze(
+    req: schemas.AnalyzeRequest,
+    request: Request,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """分析K线图表（需要用户认证）"""
+    print(f"📊 开始分析请求，用户: {current_user.id}, 平台: {req.platform}")
+
+    try:
+        # 1. 检查并扣减配额（所有图片上传都消耗配额）
+        print("💰 检查并扣减配额")
+        quota_allowed, remaining = auth.check_and_increment_quota(db, current_user)
+
+        if not quota_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "daily_limit_exceeded",
+                    "message": f"今日免费次数已用完（{current_user.quota_total}次/天），请明日再试",
+                    "message_en": f"Daily free limit reached ({current_user.quota_total}/day). Try again tomorrow."
+                }
+            )
+
+        print(f"✅ 配额已扣减，剩余次数: {remaining}")
+
+        # 2. 第一阶段：图片验证
+        print("🔍 第一阶段：图片验证")
+
+        # 调试：记录接收到的图片数据信息
+        image_data = req.image_base64
+        print(f"🔍 接收到的图片数据长度: {len(image_data)} 字符")
+        if len(image_data) > 100:
+            print(f"🔍 图片数据前100字符: {image_data[:100]}...")
+            print(f"🔍 图片数据后50字符: ...{image_data[-50:]}")
+        else:
+            print(f"🔍 图片数据内容: {image_data}")
+
+        # 检查是否可能是数据URL
+        if image_data.startswith('data:'):
+            print(f"🔍 检测到数据URL格式")
+            if ';base64,' in image_data:
+                print(f"🔍 包含base64前缀")
+
+        validation_result = await validate_image(req.image_base64, req.platform)
+
+        if not validation_result["valid"]:
+            # 验证失败，但配额已扣减
+            print(f"❌ 图片验证失败: {validation_result['reason']} (配额已消耗)")
+            raise InvalidImageError(
+                reason=f"{validation_result['reason']} (已消耗1次分析次数)",
+                reason_en=f"{validation_result['reason_en']} (1 analysis quota consumed)"
+            )
+
+        print(f"✅ 图片验证通过: {validation_result['metadata']}")
+
+        # 3. 第二阶段：完整分析
+        print("🔍 第二阶段：完整分析")
+        platform = req.platform
+
+        # 使用配置管理器获取提示词
+        if config_manager:
+            try:
+                # 检查平台是否支持
+                supported_platforms = config_manager.list_platforms()
+                if platform not in supported_platforms:
+                    print(f"⚠️ 平台 {platform} 不支持，使用默认平台: tradingview")
+                    platform = "tradingview"
+
+                # 获取增强版提示词（包含示例参考）
+                system_prompt = config_manager.get_enhanced_prompt(platform, req.lang)
+                print(f"✅ 使用配置管理器加载增强提示词，平台: {platform}, 语言: {req.lang}")
+                print(f"📊 提示词长度: {len(system_prompt)} 字符")
+
+            except Exception as e:
+                print(f"⚠️ 配置管理器加载提示词失败，使用旧逻辑: {e}")
+                # 回退到旧逻辑
+                platform = req.platform if req.platform in ["aggr", "tradingview"] else "tradingview"
+                lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
+                # 使用硬编码的提示词（从备份中获取）
+                system_prompt = _get_legacy_prompt(platform) + _get_legacy_output_format() + f"\n\n{lang_note}"
+        else:
+            # 配置管理器未初始化，使用旧逻辑
+            platform = req.platform if req.platform in ["aggr", "tradingview"] else "tradingview"
+            lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
+            system_prompt = _get_legacy_prompt(platform) + _get_legacy_output_format() + f"\n\n{lang_note}"
+
+        # 使用通用的call_ai_api函数进行完整分析
+        raw = await call_ai_api(
+            image_base64=req.image_base64,
+            system_prompt=system_prompt,
+            max_tokens=3000,
+            temperature=0.7,
+            is_validation=False
+        )
+
+        # 4. 解析元数据
+        meta = {}
+        for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
+            m = re.search(rf"{key}:(.+?)(?:\n|$)", raw)
+            value = m.group(1).strip() if m else ""
+
+            # 特殊处理rating_score，需要转换为整数
+            if key == "RATING_SCORE":
+                try:
+                    meta[key.lower()] = int(value) if value else 0
+                except ValueError:
+                    print(f"⚠️ rating_score转换失败: '{value}'，使用默认值0")
+                    meta[key.lower()] = 0
+            # 确保price是字符串
+            elif key == "PRICE":
+                meta[key.lower()] = str(value) if value else "0"
+            else:
+                meta[key.lower()] = value
+
+        # 5. 清理报告内容
+        clean = re.sub(r"\n*---\s*\nMETADATA.*$", "", raw, flags=re.DOTALL).strip()
+
+        print(f"📊 解析的元数据: {meta}")
+        print(f"📊 原始报告内容长度: {len(raw)} 字符")
+        print(f"📊 清理后报告内容长度: {len(clean)} 字符")
+
+        # 6. 创建AnalysisMetadata实例
+        try:
+            analysis_metadata = schemas.AnalysisMetadata(**meta)
+            print(f"✅ 成功创建AnalysisMetadata: {analysis_metadata}")
+        except Exception as e:
+            print(f"❌ 创建AnalysisMetadata失败: {e}")
+            print(f"❌ meta字典内容: {meta}")
+            # 创建默认的AnalysisMetadata
+            analysis_metadata = schemas.AnalysisMetadata()
+            print(f"✅ 使用默认AnalysisMetadata: {analysis_metadata}")
+
+        # 7. 计算图片哈希
+        image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
+
+        # 8. 保存图片到对象存储或数据库
+        image_storage_data = req.image_base64  # 默认使用base64
+
+        if storage_config.is_enabled():
+            try:
+                print(f"📤 尝试上传图片到对象存储，用户ID: {current_user.id}")
+                # 上传到对象存储
+                image_url = storage_service.upload_image(
+                    user_id=current_user.id,
+                    image_hash=image_hash,
+                    image_base64=req.image_base64
+                )
+                image_storage_data = image_url
+                print(f"✅ 图片已上传到对象存储: {image_url}")
+            except Exception as e:
+                print(f"⚠️ 对象存储上传失败，回退到数据库存储: {e}")
+                # 上传失败，回退到数据库存储
+                image_storage_data = req.image_base64
+        else:
+            print(f"ℹ️ 对象存储未启用，使用数据库存储")
+
+        # 9. 保存分析记录到数据库
+        db_record = models.AnalysisRecord(
+            user_id=current_user.id,
+            platform=platform,
+            image_hash=image_hash,
+            image_data=image_storage_data,  # 存储base64或对象存储URL
+            report_data={
+                "report": clean,
+                "raw": raw,
+                "lang": req.lang
+            },
+            analysis_metadata=meta,
+            visibility=getattr(req, 'visibility', 'private')  # 设置可见性，默认为private
+        )
+        db.add(db_record)
+        db.commit()
+        db.refresh(db_record)
+
+        print(f"✅ 分析完成，记录ID: {db_record.id}, 剩余次数: {remaining}")
+
+        return schemas.AnalyzeResponse(
+            report=clean,
+            analysis_metadata=analysis_metadata,
+            remaining_today=remaining,
+            platform=platform,
+            record_id=db_record.id
+        )
+
+    except InvalidImageError:
+        # 无效图片错误，配额已扣减，直接抛出
+        print("⚠️ 无效图片错误（配额已扣减）")
+        raise
+    except HTTPException:
+        # 其他HTTP异常，直接抛出
+        raise
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ 分析失败错误详情:\n{error_details}")
+        raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
+
+
+@app.post("/ask", response_model=schemas.AskResponse)
+async def ask_question(
+    ask_data: schemas.AskRequest,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """提问关于分析报告的问题"""
+    # 这个端点现在由conversation路由器处理
+    # 这里保持向后兼容，重定向到新的端点
+    from routers.conversation import ask_question as conversation_ask
+
+    return await conversation_ask(
+        analysis_id=ask_data.analysis_id,
+        ask_data=ask_data,
+        current_user=current_user,
+        db=db
+    )
+
+
+async def validate_image(image_base64: str, platform: str) -> dict:
+    """验证图片是否符合K线图要求"""
+    print(f"🔍 开始验证图片，平台: {platform}")
+
+    # 使用新的图片验证器
+    if image_validator is None:
+        # 回退到旧的验证逻辑
+        return await _legacy_validate_image(image_base64, platform)
+
+    try:
+        # 使用默认语言（zh）进行验证
+        validation_result = await image_validator.validate(image_base64, platform, "zh")
+
+        if validation_result["valid"]:
+            print(f"✅ 图片验证通过: {validation_result['metadata']}")
+        else:
+            print(f"❌ 图片验证失败: {validation_result['reason']}")
+
+        return validation_result
+
+    except Exception as e:
+        print(f"⚠️ 新验证器失败，回退到旧逻辑: {e}")
+        return await _legacy_validate_image(image_base64, platform)
+
+
+async def _legacy_validate_image(image_base64: str, platform: str) -> dict:
+    """旧的验证逻辑（回退方案）"""
+    print(f"🔍 使用旧验证逻辑，平台: {platform}")
+
+    # 获取验证提示词
+    validation_prompt = "你是一个K线图表验证专家。请判断这张图片是否符合以下要求：\n\n要求：\n1. 必须是金融交易图表（K线图、蜡烛图）\n2. 必须包含价格走势信息\n3. 必须能识别交易对（如BTC/USD, ETH/USD等）\n4. 必须能识别时间周期（如1h, 4h, 1d等）\n\n请只回答以下格式之一：\nVALID: [交易对] [时间周期] [简要描述]\nINVALID: [原因]\n\n示例：\nVALID: BTC/USD 4h 比特币4小时K线图，包含价格和成交量\nINVALID: 这不是金融图表，看起来是网页截图\nINVALID: 无法识别交易对和时间周期\nINVALID: 图片模糊无法识别"
+
+    if config_manager:
+        try:
+            validation_prompt = config_manager.get_validation_prompt("zh")
+        except Exception as e:
+            print(f"⚠️ 获取验证提示词失败: {e}")
+
+    # 调用AI进行验证（使用较小token限制）
+    validation_response = await call_ai_api(
+        image_base64=image_base64,
+        system_prompt=validation_prompt,
+        max_tokens=100,  # 限制token，快速响应
+        temperature=0.1,  # 低随机性，确保一致性
+        is_validation=True  # 标记为验证阶段
+    )
+
+    response_text = validation_response.strip()
+    print(f"🔍 验证响应: {response_text}")
+
+    # 解析响应
+    if response_text.startswith("VALID:"):
+        # 提取元数据
+        parts = response_text[6:].strip().split(" ", 2)
+        if len(parts) >= 3:
+            pair, timeframe, description = parts[0], parts[1], parts[2]
+        else:
+            pair, timeframe, description = "UNKNOWN", "UNKNOWN", response_text[6:].strip()
+
+        print(f"✅ 图片验证通过: pair={pair}, timeframe={timeframe}")
+        return {
+            "valid": True,
+            "metadata": {
+                "pair": pair,
+                "timeframe": timeframe,
+                "description": description
+            }
+        }
+    elif response_text.startswith("INVALID:"):
+        reason = response_text[8:].strip()
+        print(f"❌ 图片验证失败: {reason}")
+        return {
+            "valid": False,
+            "reason": reason,
+            "reason_en": reason  # 暂时使用相同文本，后续可以添加翻译
+        }
+    else:
+        # 无法解析响应，默认无效
+        print(f"⚠️ 无法解析验证响应: {response_text}")
+        return {
+            "valid": False,
+            "reason": "无法验证图片内容",
+            "reason_en": "Unable to validate image content"
+        }
+
+async def call_ai_api(image_base64: str, system_prompt: str, max_tokens: int = 3000,
+                     temperature: float = 0.7, is_validation: bool = False) -> str:
+    """调用AI API的通用函数，支持验证阶段和完整分析阶段"""
+    if MODEL_PROVIDER == "minimax":
+        api_url = MINIMAX_URL
+        api_key = MINIMAX_API_KEY
+        model = MINIMAX_MODEL
+
+        # MiniMax 官方视觉格式
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"[Image base64:{image_base64}]\n请分析这张图表截图。"
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    elif MODEL_PROVIDER == "qwen":
+        api_url = QWEN_URL
+        api_key = QWEN_API_KEY
+        model = QWEN_MODEL
+
+        # Qwen (OpenAI兼容格式，支持视觉)
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"}
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图。"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    else:
+        # DeepSeek (OpenAI兼容格式)
+        api_url = DEEPSEEK_URL
+        api_key = DEEPSEEK_API_KEY
+        model = DEEPSEEK_MODEL
+
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{image_base64}"}
+                        },
+                        {
+                            "type": "text",
+                            "text": "请分析这张图表截图。"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(api_url, json=payload, headers=headers)
+
+            # 打印原始响应便于调试
+            print(f"🤖 AI API调用 ({'验证' if is_validation else '分析'}阶段) - HTTP状态码: {resp.status_code}")
+
+            resp.raise_for_status()
+
+            # OpenAI 兼容格式解析
+            raw = resp.json()["choices"][0]["message"]["content"]
+            print(f"🤖 AI响应 (前200字符): {raw[:200]}...")
+
+            return raw
+
+    except httpx.HTTPStatusError as e:
+        provider_map = {
+            "minimax": "Minimax",
+            "qwen": "Qwen",
+            "deepseek": "DeepSeek"
+        }
+        provider_name = provider_map.get(MODEL_PROVIDER, "DeepSeek")
+        error_body = e.response.text[:300]
+        print(f"❌ {provider_name} API 错误 {e.response.status_code}: {error_body}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"{provider_name} API 错误: {e.response.status_code} - {error_body}"
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ AI API调用失败: {error_details}")
+        raise HTTPException(status_code=500, detail=f"AI API调用失败: {str(e)}")
+
+
+# 中间件：记录API访问日志
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = datetime.utcnow()
+
+    response = await call_next(request)
+
+    process_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+
+    # 可以在这里记录到数据库
+    # 暂时只打印日志
+    print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}ms")
+
+    return response
+
+
+@app.get("/debug/ai-config")
+async def debug_ai_config():
+    """调试端点：检查AI配置系统状态"""
+    try:
+        if config_manager is None:
+            return {
+                "status": "error",
+                "message": "配置管理器未初始化",
+                "config_system": "disabled"
+            }
+
+        # 获取支持的平台
+        platforms = config_manager.list_platforms()
+
+        # 获取各平台支持的语言
+        platform_languages = {}
+        for platform in platforms:
+            languages = config_manager.list_supported_languages("platforms", platform)
+            platform_languages[platform] = languages
+
+        # 获取验证配置
+        validation_config = config_manager.get_validation_config()
+
+        return {
+            "status": "ok",
+            "config_system": "enabled",
+            "base_path": str(config_manager.base_path),
+            "supported_platforms": platforms,
+            "platform_languages": platform_languages,
+            "validation_config": {
+                "size_validation": validation_config.size_validation,
+                "ai_validation": validation_config.ai_validation,
+                "reference_comparison": validation_config.reference_comparison
+            },
+            "cache_stats": {
+                "prompt_cache_size": len(config_manager.cache),
+                "config_cache_size": len(config_manager.config_cache)
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return {
+            "status": "error",
+            "message": str(e),
+            "error_type": type(e).__name__,
+            "traceback": error_details
+        }
+
+
+@app.get("/debug/storage")
+async def debug_storage():
+    """调试端点：检查对象存储状态"""
+    try:
+        # 检查配置
+        is_enabled = storage_config.is_enabled()
+        config_valid, config_error = storage_config.validate()
+
+        config_info = {
+            "enabled": is_enabled,
+            "config_valid": config_valid,
+            "config_error": config_error,
+            "storage_type": storage_config.storage_type,
+            "max_image_size_mb": storage_config.max_image_size_mb,
+            "bucket": storage_config.bucket,
+            "endpoint_url": storage_config.endpoint_url,
+            "public_url_prefix": storage_config.public_url_prefix,
+            "region": storage_config.region,
+            "access_key_id_set": bool(storage_config.access_key_id),
+            "secret_access_key_set": bool(storage_config.secret_access_key)
+        }
+
+        # 测试连接（如果已启用）
+        connection_ok = False
+        connection_error = None
+        if is_enabled and config_valid:
+            connection_ok, connection_error = storage_service.test_connection()
+
+        return {
+            "status": "ok",
+            "storage": {
+                **config_info,
+                "connection_ok": connection_ok,
+                "connection_error": connection_error
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        return {
+            "status": "error",
+            "message": str(e),
+            "error_type": type(e).__name__,
+            "traceback": error_details
+        }
+
+
+# 辅助函数：获取旧的提示词（回退方案）
+def _get_legacy_prompt(platform: str) -> str:
+    """获取旧的平台提示词"""
+    prompts = {
+        "aggr": """你是 Candlebot · K线专家，专门解读 aggr.trade 的行情截图，用小白也能看懂的语言输出分析报告。
 
 从截图识别以下指标：
 - 交易对、时间周期、当前价格
@@ -108,11 +911,9 @@ PROMPT_AGGR = """
 - ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
 - ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
 - ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
-- <40%:  ⚫⚫⚫等待观望
-"""
+- <40%:  ⚫⚫⚫等待观望""",
 
-PROMPT_TV = """
-你是 Candlebot · K线专家，专门解读 TradingView 的行情截图，用小白也能看懂的语言输出分析报告。
+        "tradingview": """你是 Candlebot · K线专家，专门解读 TradingView 的行情截图，用小白也能看懂的语言输出分析报告。
 
 从截图识别以下指标：
 - 交易对、时间周期、当前价格
@@ -133,12 +934,14 @@ PROMPT_TV = """
 - ≥80%: 🟢🟢🟢做多良机 / 🔴🔴🔴做空良机
 - ≥50%: 🟢🟢⚫适度做多 / 🔴🔴⚫适度做空
 - ≥40%: 🟢⚫⚫可以做多 / 🔴⚫⚫可以做空
-- <40%:  ⚫⚫⚫等待观望
-"""
+- <40%:  ⚫⚫⚫等待观望"""
+    }
+    return prompts.get(platform, prompts["tradingview"])
 
-PROMPTS = {"aggr": PROMPT_AGGR, "tradingview": PROMPT_TV}
 
-OUTPUT_FORMAT = """
+def _get_legacy_output_format() -> str:
+    """获取旧的输出格式"""
+    return """
 ## 输出格式（严格遵循，Markdown）
 
 {交易对} · {时间周期} · ${价格}
@@ -187,219 +990,6 @@ TIMEFRAME:[时间周期，如15m]
 """
 
 
-@app.get("/")
-async def root():
-    """API根端点"""
-    return {
-        "name": "Candlebot API",
-        "version": "2.0.0",
-        "description": "AI驱动的K线图表分析API",
-        "docs": "/docs",
-        "endpoints": {
-            "auth": "/auth",
-            "analysis": "/analysis",
-            "conversation": "/conversation"
-        }
-    }
-
-
-@app.get("/health")
-async def health():
-    """健康检查端点"""
-    return {
-        "status": "ok",
-        "provider": MODEL_PROVIDER,
-        "model": MINIMAX_MODEL if MODEL_PROVIDER == "minimax" else DEEPSEEK_MODEL,
-        "database": "connected",
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-
-@app.post("/analyze", response_model=schemas.AnalyzeResponse)
-async def analyze(
-    req: schemas.AnalyzeRequest,
-    request: Request,
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """分析K线图表（需要用户认证）"""
-    # 检查用户配额
-    allowed, remaining = auth.check_user_quota(current_user)
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "error": "daily_limit_exceeded",
-                "message": f"今日免费次数已用完（{current_user.quota_total}次/天），请明日再试",
-                "message_en": f"Daily free limit reached ({current_user.quota_total}/day). Try again tomorrow."
-            }
-        )
-
-    platform = req.platform if req.platform in PROMPTS else "tradingview"
-    lang_note = "请用中文输出报告。" if req.lang == "zh" else "Please output the report in English."
-    system_prompt = PROMPTS[platform] + OUTPUT_FORMAT + f"\n\n{lang_note}"
-
-    # 调用AI API
-    if MODEL_PROVIDER == "minimax":
-        api_url = MINIMAX_URL
-        api_key = MINIMAX_API_KEY
-        model = MINIMAX_MODEL
-
-        # MiniMax 官方视觉格式
-        payload = {
-            "model": model,
-            "max_tokens": 3000,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": f"[Image base64:{req.image_base64}]\n请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                }
-            ]
-        }
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-    else:
-        # DeepSeek (OpenAI兼容格式)
-        api_url = DEEPSEEK_URL
-        api_key = DEEPSEEK_API_KEY
-        model = DEEPSEEK_MODEL
-
-        payload = {
-            "model": model,
-            "max_tokens": 3000,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{req.image_base64}"}
-                        },
-                        {
-                            "type": "text",
-                            "text": "请分析这张图表截图，严格按照格式输出完整报告，末尾必须包含METADATA块。"
-                        }
-                    ]
-                }
-            ]
-        }
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(api_url, json=payload, headers=headers)
-
-            # 打印原始响应便于调试
-            print(f"HTTP状态码: {resp.status_code}")
-            try:
-                resp_preview = json.dumps(resp.json(), indent=2, ensure_ascii=False)[:800]
-                print(f"响应内容预览: {resp_preview}")
-            except Exception:
-                print(f"响应文本: {resp.text[:500]}")
-
-            resp.raise_for_status()
-
-            # OpenAI 兼容格式解析
-            raw = resp.json()["choices"][0]["message"]["content"]
-
-        # 解析元数据
-        meta = {}
-        for key in ["RATING", "RATING_SCORE", "SUMMARY", "PAIR", "PRICE", "TIMEFRAME"]:
-            m = re.search(rf"{key}:(.+?)(?:\n|$)", raw)
-            meta[key.lower()] = m.group(1).strip() if m else ""
-
-        # 清理报告内容
-        clean = re.sub(r"\n*---\s*\nMETADATA.*$", "", raw, flags=re.DOTALL).strip()
-
-        # 计算图片哈希
-        image_hash = hashlib.sha256(req.image_base64.encode()).hexdigest()
-
-        # 保存分析记录到数据库
-        db_record = models.AnalysisRecord(
-            user_id=current_user.id,
-            platform=platform,
-            image_hash=image_hash,
-            image_data=req.image_base64,  # 可选：保存图片数据
-            report_data={
-                "report": clean,
-                "raw": raw,
-                "lang": req.lang
-            },
-            analysis_metadata=meta
-        )
-        db.add(db_record)
-        db.commit()
-        db.refresh(db_record)
-
-        # 增加用户配额使用
-        auth.increment_user_quota(db, current_user)
-
-        # 重新计算剩余次数
-        _, new_remaining = auth.check_user_quota(current_user)
-
-        return schemas.AnalyzeResponse(
-            report=clean,
-            meta=schemas.AnalysisMetadata(**meta),
-            remaining_today=new_remaining,
-            platform=platform,
-            record_id=db_record.id
-        )
-
-    except httpx.HTTPStatusError as e:
-        provider_name = "Minimax" if MODEL_PROVIDER == "minimax" else "DeepSeek"
-        error_body = e.response.text[:300]
-        print(f"{provider_name} API 错误 {e.response.status_code}: {error_body}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"{provider_name} API 错误: {e.response.status_code} - {error_body}"
-        )
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"分析失败错误详情:\n{error_details}")
-        raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
-
-
-@app.post("/ask", response_model=schemas.AskResponse)
-async def ask_question(
-    ask_data: schemas.AskRequest,
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """提问关于分析报告的问题"""
-    # 这个端点现在由conversation路由器处理
-    # 这里保持向后兼容，重定向到新的端点
-    from routers.conversation import ask_question as conversation_ask
-
-    return await conversation_ask(
-        analysis_id=ask_data.analysis_id,
-        ask_data=ask_data,
-        current_user=current_user,
-        db=db
-    )
-
-
-# 中间件：记录API访问日志
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = datetime.utcnow()
-
-    response = await call_next(request)
-
-    process_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-
-    # 可以在这里记录到数据库
-    # 暂时只打印日志
-    print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.2f}ms")
-
-    return response
+# ============================================================================
+# 提示词管理API端点
+# ============================================================================

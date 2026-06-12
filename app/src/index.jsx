@@ -2,28 +2,65 @@
 import { render } from 'solid-js/web'
 import './index.css'
 import { Router, Route } from "@solidjs/router";
-import { AuthProvider } from './lib/auth'
-import Home from './pages/Home';
+import { AuthProvider } from './contexts/auth'
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
+import NewAnalysis from './pages/NewAnalysis';
+import AnalysisResult from './pages/AnalysisResult';
 import OAuthCallback from './pages/OAuthCallback';
+import UserTestPage from './pages/UserTest';
+import TestProxyPage from './pages/TestProxy';
+import TestUploadPage from './pages/TestUpload';
 import NotFound from './pages/NotFound';
+import New from './pages/New';
+import Header from './components/Header';
 
 const root = document.getElementById('root')
 
+const RootLayout = props => {
+  return (
+    <>
+    {props?.children}
+    </>
+  )
+}
+
+const LayoutWithHeader = props => {
+  return(
+    <>
+      <Header/>
+      {props?.children}
+    </>
+  )
+}
+
+
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Route path="/" component={Home} />
+
+    <AuthProvider>
+      <Router root={RootLayout}>
+
+        <Route path="/" component={Dashboard} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
-        <Route path="/dashboard" component={Dashboard} />
         <Route path="/oauth/callback" component={OAuthCallback} />
-        <Route path="*" component={NotFound} />
-      </AuthProvider>
-    </Router>
+        <Route path="/new" component={New} />
+        <Route path="/analysis/:id" component={AnalysisResult} />
+        {/* <Route path="/dashboard" component={Dashboard} />
+        <Route path="/new" component={NewAnalysis} />
+        <Route path="/analysis/:id" component={AnalysisResult} />
+        
+        <Route path="/user-test" component={UserTestPage} />
+        <Route path="/test-proxy" component={TestProxyPage} />
+        <Route path="/test-upload" component={TestUploadPage} />
+        <Route path="/test-redirect" component={TestRedirectPage} /> */}
+        <Route path="*404" component={NotFound} />
+      </Router>
+    </AuthProvider>
+
   )
 }
 

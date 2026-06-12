@@ -1,0 +1,11 @@
+{
+  "name": "template",
+  "description": "通用平台模板",
+  "supported_languages": ["zh", "en"],
+  "features": ["通用分析", "基础指标"],
+  "validation_requirements": {
+    "min_width": 600,
+    "aspect_ratio": [1.5, 2.5],
+    "required_elements": ["K线图", "价格轴"]
+  }
+}

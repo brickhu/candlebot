@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "CandleSnap - CandleBot Helper",
+  "version": "1.0.0",
+  "description": "Capture trade charts and send to CandleBot.",
+  "permissions": ["storage", "tabs", "activeTab", "unlimitedStorage"],
+  "host_permissions": [ "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://aggr.trade/*",
+    "https://*.tradingview.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ]
+}

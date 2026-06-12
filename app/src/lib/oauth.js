@@ -65,17 +65,56 @@ export function extractOAuthCodeFromUrl() {
 }
 
 // 设置当前OAuth provider
-export function setOAuthProvider(provider) {
+export function setOAuthProvider(provider, fromUrl = null) {
   localStorage.setItem('oauth_provider', provider)
+
+  // 保存登录前的页面URL，用于OAuth登录成功后重定向
+  // 优先使用传入的fromUrl，否则使用当前页面URL
+  let redirectUrl = fromUrl || window.location.href
+
+  // 如果fromUrl是相对路径，转换为完整URL
+  if (fromUrl && !fromUrl.startsWith('http://') && !fromUrl.startsWith('https://')) {
+    // 如果是相对路径，添加当前origin
+    redirectUrl = window.location.origin + (fromUrl.startsWith('/') ? fromUrl : '/' + fromUrl)
+    console.log('将相对路径转换为完整URL:', fromUrl, '->', redirectUrl)
+  }
+
+  localStorage.setItem('oauth_redirect_url', redirectUrl)
+  console.log('保存OAuth重定向URL:', redirectUrl)
 }
 
 // 清除OAuth provider
 export function clearOAuthProvider() {
   localStorage.removeItem('oauth_provider')
+  localStorage.removeItem('oauth_redirect_url')
 }
 
 // 获取重定向URI（根据当前环境）
 export function getRedirectUri() {
+  // 1. 优先使用环境变量配置的回调地址
+  const envRedirectUri = import.meta.env.VITE_OAUTH_REDIRECT_URI
+  if (envRedirectUri) {
+    return envRedirectUri
+  }
+
+  // 2. 根据当前环境自动选择
   const baseUrl = window.location.origin
-  return `${baseUrl}/oauth/callback`
+  const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')
+
+  if (isLocalhost) {
+    // 开发环境
+    return `${baseUrl}/oauth/callback`
+  } else {
+    // 生产环境 - 使用HTTPS
+    const protocol = baseUrl.startsWith('https') ? 'https' : 'http'
+    const domain = window.location.hostname
+
+    // 如果是IP地址，保持原样
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(domain)) {
+      return `${baseUrl}/oauth/callback`
+    }
+
+    // 否则使用当前域名
+    return `${protocol}://${domain}/oauth/callback`
+  }
 }

@@ -12,7 +12,7 @@ load_dotenv()
 # 数据库连接URL
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/candlebot"
+    "sqlite:///./candlebot.db"  # 默认使用SQLite
 )
 
 # 创建数据库引擎

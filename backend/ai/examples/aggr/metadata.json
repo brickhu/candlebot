@@ -1,0 +1,74 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-04-07",
+  "examples": [
+    {
+      "id": "example_1",
+      "filename": "example_1_uptrend.jpg",
+      "description": "典型ETHUSD 15分钟上升趋势",
+      "features": [
+        "CVD曲线明显上升（角度约20度）",
+        "Delta柱连续6根绿色（强买方信号）",
+        "价格稳定在VWAP上方1.5%",
+        "成交量放量（为平均1.8倍）",
+        "无接近的清算密集区"
+      ],
+      "analysis_points": {
+        "pair": "ETHUSD",
+        "timeframe": "15m",
+        "price": 3450.50,
+        "trend": "上升",
+        "cvd_signal": "强买方",
+        "delta_signal": "连续6根买方",
+        "volume_signal": "放量",
+        "vwap_position": "上方",
+        "liquidation_zones": "无接近",
+        "probability_score": 82,
+        "rating": "🟢🟢🟢做多良机",
+        "summary": "多重技术指标确认上升趋势，CVD与Delta双重买方信号，成交量配合良好，建议逢低做多"
+      }
+    },
+    {
+      "id": "example_2",
+      "filename": "example_2_downtrend.png",
+      "description": "典型BTCUSD 1小时下降趋势",
+      "features": [
+        "CVD曲线下降（角度约-18度）",
+        "Delta柱连续5根红色（强卖方信号）",
+        "价格在VWAP下方2.3%",
+        "接近下方清算密集区（$61,800-$62,200）",
+        "1h副图显示大级别下降趋势"
+      ],
+      "analysis_points": {
+        "pair": "BTCUSD",
+        "timeframe": "1h",
+        "price": 62300.75,
+        "trend": "下降",
+        "cvd_signal": "强卖方",
+        "delta_signal": "连续5根卖方",
+        "volume_signal": "缩量",
+        "vwap_position": "下方",
+        "liquidation_zones": "$61,800-$62,200",
+        "probability_score": 68,
+        "rating": "🔴🔴⚫适度做空",
+        "summary": "技术指标显示卖方主导，接近清算密集区增加下行风险，建议反弹做空，严格止损"
+      }
+    }
+  ],
+  "analysis_guidelines": {
+    "price_precision": 2,
+    "angle_threshold": 15,
+    "delta_continuity_threshold": 3,
+    "volume_threshold": 1.5,
+    "liquidation_proximity": 0.02,
+    "probability_calculation": {
+      "base": 50,
+      "strong_signal": 15,
+      "weak_signal": 8,
+      "negative_signal": -10,
+      "resonance_bonus": 15,
+      "liquidation_risk": -20,
+      "key_level_bonus": 10
+    }
+  }
+}

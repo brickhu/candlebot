@@ -32,7 +32,7 @@ class UserInDB(UserBase):
     plan_type: str
     quota_total: int
     quota_used: int
-    quota_remaining: int
+    quota_remaining: Optional[int] = None  # 计算字段，可选
     settings: Dict[str, Any]
     created_at: datetime
     last_login_at: Optional[datetime]
@@ -78,6 +78,7 @@ class AnalysisRecordBase(BaseModel):
     platform: str
     image_hash: Optional[str] = None
     analysis_metadata: AnalysisMetadata
+    visibility: str = "private"  # private/public
 
 
 class AnalysisRecordCreate(AnalysisRecordBase):
@@ -98,6 +99,16 @@ class AnalysisRecordInDB(AnalysisRecordBase):
 class AnalysisRecordPublic(AnalysisRecordBase):
     id: int
     user_id: int
+    created_at: datetime
+    has_image: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class AnalysisRecordPublicNoAuth(AnalysisRecordBase):
+    """无认证访问时返回的分析记录（不包含敏感信息）"""
+    id: int
     created_at: datetime
     has_image: bool = False
 
@@ -162,6 +173,7 @@ class AnalyzeRequest(BaseModel):
     image_base64: str
     platform: str = "tradingview"
     lang: str = "zh"
+    visibility: str = "private"  # private/public
 
 
 class AnalyzeResponse(BaseModel):

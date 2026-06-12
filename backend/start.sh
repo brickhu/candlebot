@@ -21,6 +21,13 @@ if [ -z "$SECRET_KEY" ]; then
     export SECRET_KEY="dev-secret-key-change-in-production"
 fi
 
+# 开发环境特定配置
+if [ "$ENVIRONMENT" = "development" ] || [ "$RAILWAY_ENVIRONMENT" = "development" ]; then
+    echo "🔧 开发环境配置"
+    # 可以在这里添加开发环境特定的配置
+    export DEBUG=true
+fi
+
 # 检查数据库连接
 echo "检查数据库连接..."
 python -c "
@@ -48,9 +55,39 @@ except Exception as e:
 
 # 运行数据库迁移（如果使用Alembic）
 if [ -f "alembic.ini" ]; then
-    echo "运行数据库迁移..."
+    echo "运行Alembic数据库迁移..."
     alembic upgrade head
 fi
+
+# 检查数据库表结构
+echo "检查数据库表结构..."
+python -c "
+import os
+import sys
+from sqlalchemy import create_engine, text, inspect
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+try:
+    engine = create_engine(DATABASE_URL)
+    inspector = inspect(engine)
+
+    # 检查必要的表
+    required_tables = ['users', 'analysis_records', 'conversations']
+    missing_tables = []
+
+    for table in required_tables:
+        if not inspector.has_table(table):
+            missing_tables.append(table)
+
+    if missing_tables:
+        print(f'⚠️  缺少必要的表: {missing_tables}')
+        print('   请运行数据库迁移或手动创建表')
+    else:
+        print('✅ 所有必要的表都存在')
+
+except Exception as e:
+    print(f'⚠️  检查数据库表结构失败: {e}')
+"
 
 # 启动服务
 echo "启动 FastAPI 服务..."

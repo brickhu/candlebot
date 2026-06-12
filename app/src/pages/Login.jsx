@@ -1,7 +1,9 @@
-import { createSignal } from 'solid-js'
-import { useNavigate, A } from '@solidjs/router'
-import { useAuth } from '../lib/auth'
+import { createSignal, onMount } from 'solid-js'
+import { useNavigate, A,useLocation } from '@solidjs/router'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
+
+
 
 const LoginPage = () => {
   const [email, setEmail] = createSignal('')
@@ -11,6 +13,20 @@ const LoginPage = () => {
 
   const auth = useAuth()
   const navigate = useNavigate()
+  const location = useLocation();
+
+
+  // 获取重定向来源（兼容旧代码）
+  const getRedirectPath = () => {
+
+    const { from } = location?.state || {}
+    if (from) {
+      return from
+    }
+
+    // 3. 默认返回首页
+    return '/'
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -20,7 +36,8 @@ const LoginPage = () => {
     try {
       const success = await auth.login(email(), password())
       if (success) {
-        navigate('/dashboard')
+        navigate(getRedirectPath())
+        // redirectAfterAuth(navigate)
       } else {
         setError('Invalid email or password')
       }
@@ -35,7 +52,12 @@ const LoginPage = () => {
   const handleOAuthLogin = (provider) => {
     import('../lib/oauth').then(({ getOAuthAuthUrl, setOAuthProvider, getRedirectUri }) => {
       const redirectUri = getRedirectUri()
-      setOAuthProvider(provider)
+
+      // 获取重定向来源（如果有）
+      const fromUrl = getRedirectPath()
+      // const fromUrl = redirectPath !== '/' ? window.location.origin + redirectPath : null
+
+      setOAuthProvider(provider, fromUrl)
       const authUrl = getOAuthAuthUrl(provider, redirectUri)
       window.location.href = authUrl
     })
@@ -120,7 +142,7 @@ const LoginPage = () => {
                 onInput={(e) => setEmail(e.currentTarget.value)}
                 required
                 class="w-full px-4 py-3 bg-bg border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-colors"
-                placeholder="you@example.com"
+                placeholder="Email"
               />
             </div>
 
@@ -140,7 +162,7 @@ const LoginPage = () => {
                 onInput={(e) => setPassword(e.currentTarget.value)}
                 required
                 class="w-full px-4 py-3 bg-bg border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-colors"
-                placeholder="••••••••"
+                placeholder="Password"
               />
             </div>
 
@@ -155,16 +177,19 @@ const LoginPage = () => {
                   Signing in...
                 </span>
               ) : (
-                'Sign In'
+                <span class="flex items-center justify-center gap-2">
+                  Sign In
+                </span>
+                
               )}
             </button>
           </form>
 
           <div class="mt-8 text-center text-sm text-muted">
             Don't have an account?{' '}
-            <A href="/register" class="text-primary hover:text-primary-dark font-medium">
+            <a onClick={()=>navigate("/register",{state: {from: getRedirectPath()}})} class="text-primary hover:text-primary-dark font-medium">
               Sign up
-            </A>
+            </a>
           </div>
         </div>
       </div>

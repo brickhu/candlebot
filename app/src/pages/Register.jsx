@@ -1,9 +1,10 @@
 import { createSignal } from 'solid-js'
 import { useNavigate, A } from '@solidjs/router'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../contexts/auth'
 import { api } from '../lib/api'
 
 const RegisterPage = () => {
+  console.log('🔧 RegisterPage组件开始渲染')
   const [email, setEmail] = createSignal('')
   const [username, setUsername] = createSignal('')
   const [password, setPassword] = createSignal('')
@@ -12,7 +13,41 @@ const RegisterPage = () => {
   const [isLoading, setIsLoading] = createSignal(false)
 
   const auth = useAuth()
+  console.log('🔧 Register页面中的auth对象:', auth)
+  console.log('🔧 auth的类型:', typeof auth)
+  console.log('🔧 auth.register:', auth?.register)
+  console.log('🔧 auth.register的类型:', typeof auth?.register)
   const navigate = useNavigate()
+
+  // // 获取重定向来源
+  // const getRedirectPath = () => {
+  //   // 1. 优先从URL参数中获取
+  //   const urlParams = new URLSearchParams(window.location.search)
+  //   const fromParam = urlParams.get('from')
+  //   if (fromParam) {
+  //     try {
+  //       return decodeURIComponent(fromParam)
+  //     } catch (error) {
+  //       console.error('解码from参数失败:', error)
+  //       return fromParam
+  //     }
+  //   }
+
+  //   // 2. 默认返回首页
+  //   return '/'
+  // }
+
+  const getRedirectPath = () => {
+
+    const { from } = location?.state || {}
+    if (from) {
+      return from
+    }
+
+    // 3. 默认返回首页
+    return '/'
+  }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -29,12 +64,22 @@ const RegisterPage = () => {
       return
     }
 
+    // Email validation
+    const emailValue = email()
+    if (!emailValue || !emailValue.includes('@')) {
+      setError('Please enter a valid email address')
+      return
+    }
+
     setIsLoading(true)
 
     try {
       const success = await auth.register(email(), username(), password())
       if (success) {
-        navigate('/dashboard')
+        console.log('注册成功，执行重定向')
+        const redirectPath = getRedirectPath()
+        console.log('重定向到:', redirectPath)
+        navigate(redirectPath)
       } else {
         setError('Registration failed. Please try again.')
       }
@@ -49,11 +94,16 @@ const RegisterPage = () => {
   const handleOAuthRegister = (provider) => {
     import('../lib/oauth').then(({ getOAuthAuthUrl, setOAuthProvider, getRedirectUri }) => {
       const redirectUri = getRedirectUri()
-      setOAuthProvider(provider)
+      const fromUrl = getRedirectPath()
+      setOAuthProvider(provider,fromUrl)
       const authUrl = getOAuthAuthUrl(provider, redirectUri)
       window.location.href = authUrl
     })
   }
+
+
+
+  
 
   return (
     <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center px-6 py-12 animate-fade-in">
@@ -226,7 +276,7 @@ const RegisterPage = () => {
 
           <div class="mt-8 text-center text-sm text-muted">
             Already have an account?{' '}
-            <A href="/login" class="text-primary hover:text-primary-dark font-medium">
+            <A href={`/login?from=${encodeURIComponent(window.location.href)}`} class="text-primary hover:text-primary-dark font-medium">
               Sign in
             </A>
           </div>
